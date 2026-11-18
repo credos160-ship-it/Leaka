@@ -643,7 +643,8 @@ function createPostElement(post) {
     const caption = document.createElement("p");
     caption.className = "post-caption";
     caption.textContent = post.caption;
-    article.append(caption);  const likeBtn = document.createElement("button");
+    article.append(caption);
+ const likeBtn = document.createElement("button");
   likeBtn.className = "action-btn";
 
   const postLikes = allLikes.filter(
