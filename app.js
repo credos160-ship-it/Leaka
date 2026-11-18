@@ -520,6 +520,20 @@ $("postBtn").addEventListener("click", async () => {
 });
 
 /* =========================================
+   LOAD LIKES
+========================================= */
+
+async function loadLikes() {
+  const { data, error } = await supabaseClient
+    .from("likes")
+    .select("user_id, post_id");
+
+  if (error) throw error;
+
+  allLikes = data || [];
+}
+
+/* =========================================
    LOAD POSTS
 ========================================= */
 
