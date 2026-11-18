@@ -246,14 +246,19 @@ logoutBtn.addEventListener("click", async () => {
     authMessage.textContent = "You have logged out.";
   }
 });
-
 async function updateAuthUI() {
   const { data: { session } } =
     await supabaseClient.auth.getSession();
 
+  const appContent = document.getElementById("appContent");
+  const authSection = document.getElementById("auth");
+
   signupBtn.hidden = !!session;
   loginBtn.hidden = !!session;
   logoutBtn.hidden = !session;
+
+  appContent.hidden = !session;
+  authSection.hidden = !!session;
 }
 
 supabaseClient.auth.onAuthStateChange(() => {
