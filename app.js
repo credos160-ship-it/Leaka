@@ -1,268 +1,777 @@
-const SUPABASE_URL = "https://kiwpmnvoqzrfwblnudjq.supabase.co";
+/* =========================================
+   LEAKA — FULL APP + SUPABASE
+========================================= */
 
+const SUPABASE_URL = "https://kiwpmnvoqzrfwblnudjq.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable__oAt1RpObXR5PDqSG7yE1w_SkdZ0Hry";
+const BUCKET = "leaka-media";
 
 const supabaseClient = window.supabase.createClient(
   SUPABASE_URL,
   SUPABASE_ANON_KEY
 );
-const caption = document.getElementById("caption");
-const mediaInput = document.getElementById("mediaInput");
-const preview = document.getElementById("preview");
-const posts = document.getElementById("posts");
-const postBtn = document.getElementById("postBtn");
 
+const $ = id => document.getElementById(id);
+
+let currentUser = null;
+let allPosts = [];
 let selectedMedia = null;
+let profilePostsTab = "posts";
 
-mediaInput.addEventListener("change", () => {
-  const file = mediaInput.files[0];
+let profile = {
+  name: "",
+  bio: "Welcome to my LEAKA space 💜",
+  avatar: "",
+  cover: ""
+};
 
-  preview.replaceChildren();
+/* =========================================
+   HELPERS
+========================================= */
+
+function message(id, text) {
+  const el = $(id);
+  if (el) el.textContent = text;
+}
+
+function initials(name) {
+  return (name || "U")
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map(x => x[0].toUpperCase())
+    .join("");
+}
+
+function renderAvatar(el, name, image) {
+  if (!el) return;
+
+  el.replaceChildren();
+
+  if (image) {
+    const img = document.createElement("img");
+    img.src = image;
+    img.alt = "Profile picture";
+    el.appendChild(img);
+  } else {
+    el.textContent = initials(name);
+  }
+}
+
+function showPage(id, scrollTarget) {
+  const target = $(id);
+  if (!target) return;
+
+  document.querySelectorAll(".page").forEach(page => {
+    page.hidden = page.id !== id;
+  });
+
+  document.querySelectorAll(".nav-item").forEach(item => {
+    item.classList.toggle("active", item.dataset.page === id);
+  });
+
+  window.scrollTo({ top: 0, behavior: "smooth" });
+
+  if (scrollTarget) {
+    setTimeout(() => {
+      $(scrollTarget)?.scrollIntoView({
+        behavior: "smooth",
+        block: "start"
+      });
+    }, 150);
+  }
+
+  if (id === "profile") renderProfilePosts();
+}
+
+/* =========================================
+   PROFILE
+========================================= */
+
+function renderProfile() {
+  if (!currentUser) return;
+
+  const name = profile.name || "Your name";
+
+  $("profileName").textContent = name;
+  $("profileEmail").textContent =
+    "@" + (currentUser.email || "username").split("@")[0];
+
+  $("profileBio").textContent = profile.bio;
+
+  $("displayName").value = profile.name || "";
+  $("bioInput").value = profile.bio || "";
+
+  $("accountEmail").textContent = currentUser.email;
+  $("accountDisplayName").textContent = name;
+
+  renderAvatar($("profileAvatar"), name, profile.avatar);
+  renderAvatar($("editAvatar"), name, profile.avatar);
+  renderAvatar($("profileBtn"), name, profile.avatar);
+
+  const cover = $("profileCover");
+  const coverImage = $("profileCoverImage");
+  const editPreview = $("editCoverPreview");
+
+  if (profile.cover) {
+    if (coverImage) {
+      coverImage.src = profile.cover;
+      coverImage.hidden = false;
+    }
+
+    if (cover) {
+      cover.style.backgroundImage = `url("${profile.cover}")`;
+      cover.style.backgroundSize = "cover";
+      cover.style.backgroundPosition = "center";
+    }
+
+    if (editPreview) {
+      editPreview.style.backgroundImage = `url("${profile.cover}")`;
+      editPreview.style.backgroundSize = "cover";
+      editPreview.style.backgroundPosition = "center";
+      editPreview.classList.add("has-cover");
+      editPreview.textContent = "";
+    }
+  } else {
+    if (coverImage) coverImage.hidden = true;
+
+    if (cover) cover.style.backgroundImage = "";
+
+    if (editPreview) {
+      editPreview.style.backgroundImage = "";
+      editPreview.classList.remove("has-cover");
+      editPreview.textContent = "Your LEAKA cover";
+    }
+  }
+}
+
+function loadProfile() {
+  const key = "leaka_profile_" + currentUser.id;
+
+  try {
+    const saved = JSON.parse(localStorage.getItem(key));
+
+    profile = {
+      name: saved?.name || currentUser.email.split("@")[0],
+      bio: saved?.bio || "Welcome to my LEAKA space 💜",
+      avatar: saved?.avatar || "",
+      cover: saved?.cover || ""
+    };
+  } catch {
+    profile.name = currentUser.email.split("@")[0];
+  }
+
+  renderProfile();
+}
+
+function saveProfile() {
+  localStorage.setItem(
+    "leaka_profile_" + currentUser.id,
+    JSON.stringify(profile)
+  );
+
+  renderProfile();
+}
+
+$("saveProfileBtn").addEventListener("click", () => {
+  const name = $("displayName").value.trim();
+
+  if (!name) {
+    message("profileMessage", "Please enter a display name.");
+    return;
+  }
+
+  profile.name = name;
+  profile.bio = $("bioInput").value.trim();
+
+  try {
+    saveProfile();
+    message("profileMessage", "Profile saved successfully! 💜");
+    showPage("profile");
+  } catch (error) {
+    message("profileMessage", "Could not save profile: " + error.message);
+  }
+});
+
+/* =========================================
+   SUPABASE STORAGE
+========================================= */
+
+async function uploadMedia(file, folder = "posts") {
+  const extension = file.name.split(".").pop();
+  const path =
+    currentUser.id + "/" + folder + "/" +
+    Date.now() + "." + extension;
+
+  const { error } = await supabaseClient.storage
+    .from(BUCKET)
+    .upload(path, file, {
+      contentType: file.type,
+      upsert: true
+    });
+
+  if (error) throw error;
+
+  const { data } = supabaseClient.storage
+    .from(BUCKET)
+    .getPublicUrl(path);
+
+  return data.publicUrl;
+}
+
+/* =========================================
+   AUTHENTICATION
+========================================= */
+
+$("signupBtn").addEventListener("click", async () => {
+  const email = $("email").value.trim();
+  const password = $("password").value;
+
+  if (!email || password.length < 6) {
+    message("authMessage", "Enter a valid email and password (6+ characters).");
+    return;
+  }
+
+  const btn = $("signupBtn");
+  btn.disabled = true;
+  message("authMessage", "Creating account...");
+
+  try {
+    const { data, error } = await supabaseClient.auth.signUp({
+      email,
+      password
+    });
+
+    if (error) throw error;
+
+    message(
+      "authMessage",
+      data.session
+        ? "Welcome to LEAKA! 💜"
+        : "Account created! Check your email to confirm."
+    );
+  } catch (error) {
+    message("authMessage", error.message);
+  } finally {
+    btn.disabled = false;
+  }
+});
+
+$("loginBtn").addEventListener("click", async () => {
+  const email = $("email").value.trim();
+  const password = $("password").value;
+
+  if (!email || !password) {
+    message("authMessage", "Enter your email and password.");
+    return;
+  }
+
+  const btn = $("loginBtn");
+  btn.disabled = true;
+  message("authMessage", "Logging in...");
+
+  try {
+    const { error } = await supabaseClient.auth.signInWithPassword({
+      email,
+      password
+    });
+
+    if (error) throw error;
+
+    message("authMessage", "Welcome back! 💜");
+  } catch (error) {
+    message("authMessage", error.message);
+  } finally {
+    btn.disabled = false;
+  }
+});
+
+async function logout() {
+  const { error } = await supabaseClient.auth.signOut();
+  if (error) alert(error.message);
+}
+
+$("logoutBtn").addEventListener("click", logout);
+
+$("settingsLogoutBtn").addEventListener("click", () => {
+  if (confirm("Are you sure you want to log out?")) logout();
+});
+
+/* =========================================
+   AUTH STATE
+========================================= */
+
+let handlingAuth = false;
+
+async function updateAuthUI(session) {
+  if (handlingAuth) return;
+  handlingAuth = true;
+
+  try {
+    currentUser = session?.user || null;
+
+    $("auth").hidden = !!currentUser;
+    $("appContent").hidden = !currentUser;
+
+    $("signupBtn").hidden = !!currentUser;
+    $("loginBtn").hidden = !!currentUser;
+    $("logoutBtn").hidden = !currentUser;
+
+    if (currentUser) {
+      loadProfile();
+      showPage("home");
+      await loadPosts();
+    } else {
+      allPosts = [];
+      $("posts").replaceChildren();
+    }
+  } finally {
+    handlingAuth = false;
+  }
+}
+
+supabaseClient.auth.onAuthStateChange((event, session) => {
+  if (event === "INITIAL_SESSION") return;
+  setTimeout(() => updateAuthUI(session), 0);
+});
+
+async function initializeApp() {
+  const { data, error } = await supabaseClient.auth.getSession();
+
+  if (error) {
+    message("authMessage", error.message);
+    return;
+  }
+
+  await updateAuthUI(data.session);
+}
+
+initializeApp();
+
+/* =========================================
+   NAVIGATION
+========================================= */
+
+document.querySelectorAll("[data-page]").forEach(button => {
+  button.addEventListener("click", () => {
+    showPage(button.dataset.page, button.dataset.scroll);
+  });
+});
+
+$("profileBtn").addEventListener("click", () => showPage("profile"));
+
+/* =========================================
+   PROFILE PHOTO UPLOAD
+========================================= */
+
+$("avatarInput").addEventListener("change", async event => {
+  const file = event.target.files[0];
+  if (!file) return;
+
+  if (!file.type.startsWith("image/") || file.size > 2 * 1024 * 1024) {
+    alert("Choose an image smaller than 2MB.");
+    event.target.value = "";
+    return;
+  }
+
+  try {
+    const url = await uploadMedia(file, "avatars");
+    profile.avatar = url;
+    saveProfile();
+    message("profileMessage", "Profile picture updated! 💜");
+  } catch (error) {
+    alert("Avatar upload failed: " + error.message);
+  }
+});
+
+/* =========================================
+   COVER PHOTO UPLOAD
+   One input only: coverInput
+========================================= */
+
+const coverInput = $("coverInput");
+
+if (coverInput) {
+  coverInput.addEventListener("change", async event => {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    if (!file.type.startsWith("image/")) {
+      alert("Please choose an image.");
+      event.target.value = "";
+      return;
+    }
+
+    if (file.size > 2 * 1024 * 1024) {
+      alert("Choose an image smaller than 2MB.");
+      event.target.value = "";
+      return;
+    }
+
+    message("profileMessage", "Uploading your cover...");
+
+    try {
+      const url = await uploadMedia(file, "covers");
+      profile.cover = url;
+      saveProfile();
+
+      message("profileMessage", "Cover photo updated! 💜");
+    } catch (error) {
+      alert("Cover upload failed: " + error.message);
+    }
+
+    event.target.value = "";
+  });
+}
+
+/* =========================================
+   POST MEDIA PREVIEW
+========================================= */
+
+$("mediaInput").addEventListener("change", () => {
+  const file = $("mediaInput").files[0];
+
+  $("preview").replaceChildren();
   selectedMedia = null;
 
   if (!file) return;
 
   if (!file.type.startsWith("image/") &&
       !file.type.startsWith("video/")) {
-    alert("Please select an image or video.");
-    mediaInput.value = "";
+    alert("Choose an image or video.");
     return;
   }
 
   if (file.size > 25 * 1024 * 1024) {
-    alert("File is too large. Maximum size is 25MB.");
-    mediaInput.value = "";
+    alert("Maximum upload size is 25MB.");
+    $("mediaInput").value = "";
     return;
   }
 
   selectedMedia = file;
 
-  const url = URL.createObjectURL(file);
   const element = document.createElement(
     file.type.startsWith("video/") ? "video" : "img"
   );
 
-  element.src = url;
+  element.src = URL.createObjectURL(file);
+  element.style.width = "100%";
 
   if (element.tagName === "VIDEO") {
     element.controls = true;
   }
 
-  preview.appendChild(element);
+  $("preview").appendChild(element);
 });
 
-postBtn.addEventListener("click", () => {
-  const text = caption.value.trim();
+/* =========================================
+   CREATE POST
+========================================= */
+
+$("postBtn").addEventListener("click", async () => {
+  const text = $("caption").value.trim();
 
   if (!text && !selectedMedia) {
-    alert("Write something or upload a photo/video first!");
+    alert("Write something or upload media first!");
     return;
   }
 
-  const post = document.createElement("article");
-  post.className = "post-card";
+  const btn = $("postBtn");
+  btn.disabled = true;
+  btn.textContent = "Publishing...";
+
+  try {
+    let mediaUrl = null;
+    let mediaType = null;
+
+    if (selectedMedia) {
+      mediaUrl = await uploadMedia(selectedMedia);
+      mediaType = selectedMedia.type.startsWith("video/")
+        ? "video"
+        : "image";
+    }
+
+    const { error } = await supabaseClient.from("posts").insert({
+      user_id: currentUser.id,
+      caption: text,
+      media_url: mediaUrl,
+      media_type: mediaType
+    });
+
+    if (error) throw error;
+
+    $("caption").value = "";
+    $("mediaInput").value = "";
+    $("preview").replaceChildren();
+    selectedMedia = null;
+
+    alert("Post published! 💜");
+    await loadPosts();
+
+  } catch (error) {
+    alert("Publishing failed: " + error.message);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = "Publish ↗";
+  }
+});
+
+/* =========================================
+   LOAD POSTS
+========================================= */
+
+async function loadPosts() {
+  if (!currentUser) return;
+
+  $("posts").innerHTML = `
+    <div class="empty-state">
+      <h3>Loading your feed...</h3>
+    </div>
+  `;
+
+  try {
+    const { data, error } = await supabaseClient
+      .from("posts")
+      .select("*")
+      .order("created_at", { ascending: false });
+
+    if (error) throw error;
+
+    allPosts = data || [];
+    renderPosts();
+    renderProfilePosts();
+
+  } catch (error) {
+    $("posts").textContent = "Could not load posts: " + error.message;
+  }
+}
+
+/* =========================================
+   DISPLAY POSTS
+========================================= */
+
+function createPostElement(post) {
+  const article = document.createElement("article");
+  article.className = "post-card";
+
+  const owner = post.user_id === currentUser.id;
+  const name = owner ? (profile.name || "You") : "LEAKA member";
 
   const header = document.createElement("div");
   header.className = "post-header";
 
   const avatar = document.createElement("div");
   avatar.className = "post-avatar";
-  avatar.textContent = "U";
 
-  const userInfo = document.createElement("div");
+  renderAvatar(avatar, name, owner ? profile.avatar : "");
+
+  const info = document.createElement("div");
 
   const username = document.createElement("div");
   username.className = "post-user";
-  username.textContent = "You";
+  username.textContent = name;
 
   const time = document.createElement("div");
   time.className = "post-time";
-  time.textContent = "Just now";
+  time.textContent = new Date(post.created_at).toLocaleString();
 
-  userInfo.append(username, time);
-  header.append(avatar, userInfo);
+  info.append(username, time);
+  header.append(avatar, info);
+  article.append(header);
 
-  post.appendChild(header);
-
-  if (text) {
-    const description = document.createElement("p");
-    description.className = "post-caption";
-    description.textContent = text;
-    post.appendChild(description);
+  if (post.caption) {
+    const caption = document.createElement("p");
+    caption.className = "post-caption";
+    caption.textContent = post.caption;
+    article.append(caption);
   }
 
-  if (selectedMedia) {
-    const url = URL.createObjectURL(selectedMedia);
+  if (post.media_url) {
     const media = document.createElement(
-      selectedMedia.type.startsWith("video/")
-        ? "video" : "img"
+      post.media_type === "video" ? "video" : "img"
     );
 
-    media.src = url;
+    media.src = post.media_url;
     media.className = "post-media";
 
-    if (media.tagName === "VIDEO") {
+    if (post.media_type === "video") {
       media.controls = true;
+      media.playsInline = true;
+    } else {
+      media.loading = "lazy";
     }
 
-    post.appendChild(media);
+    article.append(media);
   }
 
-  const actions = document.createElement("div");
-  actions.className = "post-actions";
+  if (owner) {
+    const actions = document.createElement("div");
+    actions.className = "post-actions";
 
-  const likeBtn = document.createElement("button");
-  likeBtn.className = "action-btn";
-  likeBtn.textContent = "♡ Like 0";
+    const edit = document.createElement("button");
+    edit.className = "action-btn";
+    edit.textContent = "✎ Edit";
+    edit.addEventListener("click", () => editPost(post));
 
-  let liked = false;
-  let likes = 0;
+    const del = document.createElement("button");
+    del.className = "action-btn";
+    del.textContent = "🗑 Delete";
+    del.addEventListener("click", () => deletePost(post));
 
-  likeBtn.addEventListener("click", () => {
-    liked = !liked;
-    likes += liked ? 1 : -1;
-
-    likeBtn.textContent = `${liked ? "♥" : "♡"} Like ${likes}`;
-    likeBtn.classList.toggle("liked", liked);
-  });
-
-  const commentLabel = document.createElement("span");
-  commentLabel.className = "action-btn";
-  commentLabel.textContent = "▢ Comment";
-
-  actions.append(likeBtn, commentLabel);
-  post.appendChild(actions);
-
-  const commentArea = document.createElement("div");
-  commentArea.className = "comment-area";
-
-  const commentInput = document.createElement("input");
-  commentInput.placeholder = "Write a comment...";
-
-  const commentBtn = document.createElement("button");
-  commentBtn.textContent = "Send";
-
-  const comments = document.createElement("div");
-  comments.className = "comments";
-
-  const addComment = () => {
-    const value = commentInput.value.trim();
-
-    if (!value) return;
-
-    const comment = document.createElement("p");
-    comment.textContent = "You: " + value;
-
-    comments.appendChild(comment);
-    commentInput.value = "";
-  };
-
-  commentBtn.addEventListener("click", addComment);
-
-  commentInput.addEventListener("keydown", event => {
-    if (event.key === "Enter") addComment();
-  });
-
-  commentArea.append(commentInput, commentBtn);
-  post.append(commentArea, comments);
-
-  const empty = posts.querySelector(".empty-state");
-  if (empty) empty.remove();
-
-  posts.prepend(post);
-
-  caption.value = "";
-  mediaInput.value = "";
-  preview.replaceChildren();
-  selectedMedia = null;
-});
-
-document.getElementById("search").addEventListener("input", event => {
-  const query = event.target.value.toLowerCase();
-
-  document.querySelectorAll(".post-card").forEach(post => {
-    post.style.display = post.textContent.toLowerCase()
-      .includes(query) ? "" : "none";
-  });
-});
-// LEAKA AUTHENTICATION
-
-const emailInput = document.getElementById("email");
-const passwordInput = document.getElementById("password");
-const signupBtn = document.getElementById("signupBtn");
-const loginBtn = document.getElementById("loginBtn");
-const logoutBtn = document.getElementById("logoutBtn");
-const authMessage = document.getElementById("authMessage");
-
-signupBtn.addEventListener("click", async () => {
-  const email = emailInput.value.trim();
-  const password = passwordInput.value;
-
-  if (!email || !password) {
-    authMessage.textContent = "Enter your email and password.";
-    return;
+    actions.append(edit, del);
+    article.append(actions);
   }
 
-  if (password.length < 6) {
-    authMessage.textContent = "Password must be at least 6 characters.";
-    return;
-  }
-
-  const { error } = await supabaseClient.auth.signUp({
-    email,
-    password
-  });
-
-  if (error) {
-    authMessage.textContent = error.message;
-  } else {
-    authMessage.textContent =
-      "Account created! Check your email to confirm your account.";
-  }
-});
-
-loginBtn.addEventListener("click", async () => {
-  const email = emailInput.value.trim();
-  const password = passwordInput.value;
-
-  const { error } = await supabaseClient.auth.signInWithPassword({
-    email,
-    password
-  });
-
-  if (error) {
-    authMessage.textContent = error.message;
-  } else {
-    authMessage.textContent = "Welcome back to Leaka! 💜";
-  }
-});
-
-logoutBtn.addEventListener("click", async () => {
-  const { error } = await supabaseClient.auth.signOut();
-
-  if (error) {
-    authMessage.textContent = error.message;
-  } else {
-    authMessage.textContent = "You have logged out.";
-  }
-});
-async function updateAuthUI() {
-  const { data: { session } } =
-    await supabaseClient.auth.getSession();
-
-  const appContent = document.getElementById("appContent");
-  const authSection = document.getElementById("auth");
-
-  signupBtn.hidden = !!session;
-  loginBtn.hidden = !!session;
-  logoutBtn.hidden = !session;
-
-  appContent.hidden = !session;
-  authSection.hidden = !!session;
+  return article;
 }
 
-supabaseClient.auth.onAuthStateChange(() => {
-  updateAuthUI();
+function renderPosts() {
+  $("posts").replaceChildren();
+
+  if (!allPosts.length) {
+    $("posts").innerHTML = `
+      <div class="empty-state">
+        <div>✦</div>
+        <h3>Your story starts here</h3>
+        <p>Be the first to share something.</p>
+      </div>
+    `;
+  } else {
+    allPosts.forEach(post => {
+      $("posts").appendChild(createPostElement(post));
+    });
+  }
+
+  $("postCount").textContent = allPosts.filter(
+    p => p.user_id === currentUser.id
+  ).length;
+}
+
+/* =========================================
+   EDIT OWN POST
+========================================= */
+
+async function editPost(post) {
+  if (post.user_id !== currentUser.id) return;
+
+  const caption = prompt("Edit your caption:", post.caption || "");
+  if (caption === null) return;
+
+  try {
+    const { error } = await supabaseClient
+      .from("posts")
+      .update({ caption: caption.trim() })
+      .eq("id", post.id)
+      .eq("user_id", currentUser.id);
+
+    if (error) throw error;
+
+    await loadPosts();
+    alert("Post updated! 💜");
+  } catch (error) {
+    alert(error.message);
+  }
+}
+
+/* =========================================
+   DELETE OWN POST
+========================================= */
+
+async function deletePost(post) {
+  if (post.user_id !== currentUser.id) return;
+  if (!confirm("Permanently delete this post?")) return;
+
+  try {
+    const { error } = await supabaseClient
+      .from("posts")
+      .delete()
+      .eq("id", post.id)
+      .eq("user_id", currentUser.id);
+
+    if (error) throw error;
+
+    await loadPosts();
+    alert("Post deleted.");
+  } catch (error) {
+    alert(error.message);
+  }
+}
+
+/* =========================================
+   PROFILE POSTS
+========================================= */
+
+function renderProfilePosts() {
+  if (!currentUser) return;
+
+  const container = $("profilePosts");
+  if (!container) return;
+
+  container.replaceChildren();
+
+  let own = allPosts.filter(p => p.user_id === currentUser.id);
+
+  $("postCount").textContent = own.length;
+
+  if (profilePostsTab === "videos") {
+    own = own.filter(p => p.media_type === "video");
+  }
+
+  if (profilePostsTab === "liked") {
+    container.textContent = "Liked posts are coming soon 💜";
+    return;
+  }
+
+  if (!own.length) {
+    container.innerHTML = `
+      <div class="empty-state">
+        <h3>No posts yet</h3>
+        <p>Your shared moments will appear here.</p>
+      </div>
+    `;
+    return;
+  }
+
+  own.forEach(post => {
+    container.appendChild(createPostElement(post));
+  });
+}
+
+document.querySelectorAll("[data-profile-tab]").forEach(button => {
+  button.addEventListener("click", () => {
+    document.querySelectorAll("[data-profile-tab]").forEach(tab => {
+      tab.classList.remove("selected");
+    });
+
+    button.classList.add("selected");
+    profilePostsTab = button.dataset.profileTab;
+    renderProfilePosts();
+  });
 });
 
-updateAuthUI();
+/* =========================================
+   SEARCH
+========================================= */
+
+$("search").addEventListener("input", event => {
+  const query = event.target.value.toLowerCase();
+
+  document.querySelectorAll("#posts .post-card").forEach(post => {
+    post.style.display = post.textContent.toLowerCase().includes(query)
+      ? ""
+      : "none";
+  });
+});
+
+/* =========================================
+   STORIES
+========================================= */
+
+$("createStoryBtn").addEventListener("click", () => {
+  alert("LEAKA Stories are coming soon! 💜");
+});
+
+/* =========================================
+   END OF LEAKA
+========================================= */
