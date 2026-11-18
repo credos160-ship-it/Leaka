@@ -643,7 +643,24 @@ function createPostElement(post) {
     const caption = document.createElement("p");
     caption.className = "post-caption";
     caption.textContent = post.caption;
-    article.append(caption);
+    article.append(caption);  const likeBtn = document.createElement("button");
+  likeBtn.className = "action-btn";
+
+  const postLikes = allLikes.filter(
+    like => like.post_id === post.id
+  );
+
+  const likedByMe = postLikes.some(
+    like => like.user_id === currentUser.id
+  );
+
+  likeBtn.textContent = `${likedByMe ? "❤️" : "🤍"} ${postLikes.length} Likes`;
+
+  likeBtn.addEventListener("click", () => {
+    toggleLike(post.id);
+  });
+
+  article.appendChild(likeBtn);
   }
 
   if (post.media_url) {
