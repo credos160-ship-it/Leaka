@@ -239,9 +239,12 @@ $("signupBtn").addEventListener("click", async () => {
 
   try {
     const { data, error } = await supabaseClient.auth.signUp({
-      email,
-      password
-    });
+  email,
+  password,
+  options: {
+    emailRedirectTo: "https://credos160-ship-it.github.io/Leaka/"
+  }
+});
 
     if (error) throw error;
 
