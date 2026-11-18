@@ -565,6 +565,48 @@ renderProfilePosts();
 }
 
 /* =========================================
+   LIKE / UNLIKE POSTS
+========================================= */
+
+async function toggleLike(postId) {
+  const existingLike = allLikes.find(
+    like =>
+      like.post_id === postId &&
+      like.user_id === currentUser.id
+  );
+
+  try {
+    if (existingLike) {
+      const { error } = await supabaseClient
+        .from("likes")
+        .delete()
+        .eq("post_id", postId)
+        .eq("user_id", currentUser.id);
+
+      if (error) throw error;
+
+    } else {
+      const { error } = await supabaseClient
+        .from("likes")
+        .insert({
+          post_id: postId,
+          user_id: currentUser.id
+        });
+
+      if (error) throw error;
+    }
+
+    await loadLikes();
+    renderPosts();
+    renderProfilePosts();
+
+  } catch (error) {
+    alert("Like failed: " + error.message);
+  }
+}
+
+
+/* =========================================
    DISPLAY POSTS
 ========================================= */
 
