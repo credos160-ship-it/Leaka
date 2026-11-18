@@ -15,6 +15,7 @@ const $ = id => document.getElementById(id);
 
 let currentUser = null;
 let allPosts = [];
+let allLikes = [];
 let selectedMedia = null;
 let profilePostsTab = "posts";
 
