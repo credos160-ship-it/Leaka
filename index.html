@@ -4,61 +4,66 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="theme-color" content="#09090f">
-  <title>Leaka - Your Social Space</title>
+  <meta name="theme-color" content="#090610">
+  <title>LEAKA — Your World</title>
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
 
   <header class="topbar">
-    <a href="#" class="logo">lea<span>ka.</span></a>
+    <a href="#home" class="logo">lea<span>ka.</span></a>
     <input type="search" id="search" placeholder="Search Leaka...">
     <button class="avatar" id="profileBtn">U</button>
   </header>
 
-  <div class="layout">
+  <!-- LOGIN SCREEN -->
+  <section class="auth-card" id="auth">
+    <div class="auth-brand">leaka<span>.</span></div>
+    <p class="eyebrow">YOUR WORLD. YOUR PEOPLE.</p>
+    <h1>Find your people.</h1>
+    <p>Share your moments. Discover your world.</p>
 
-    <aside class="sidebar">
-      <h3>MENU</h3>
-      <a class="active" href="#">⌂ &nbsp; Home</a>
-      <a href="#create">＋ &nbsp; Create post</a>
-      <a href="#feed">◉ &nbsp; Explore</a>
-      <a href="#messages">✉ &nbsp; Messages</a>
-      <a href="#profile">♙ &nbsp; My profile</a>
+    <input type="email" id="email" placeholder="Your email">
+    <input type="password" id="password" placeholder="Your password">
 
-      <div class="sidebar-bottom">
-        <p>YOUR SPACE.</p>
-        <small>Connect. Share. Discover.</small>
-      </div>
-    </aside>
+    <button id="signupBtn">Create account</button>
+    <button id="loginBtn">Log in</button>
+    <button id="logoutBtn" hidden>Log out</button>
+
+    <p id="authMessage"></p>
+  </section>
+
+  <!-- MAIN APP -->
+  <div id="appContent" hidden>
 
     <main class="main-content">
 
-      <section class="welcome">
-        <div>
-          <p class="eyebrow">YOUR WORLD. YOUR PEOPLE.</p>
-          <h1>Welcome to <span>Leaka.</span></h1>
-          <p>Discover what's happening around you.</p>
+      <!-- HOME -->
+      <section class="welcome" id="home">
+        <p class="eyebrow">WELCOME TO YOUR SPACE</p>
+        <h1>Your world.<br><span>Your rules.</span></h1>
+        <p>There's always something happening on Leaka.</p>
+      </section>
+
+      <!-- MOMENTS -->
+      <section class="moments-section">
+        <div class="section-heading">
+          <h2>Your moments</h2>
+          <span>COMING SOON</span>
         </div>
-       </section>
-       <section class="auth-card" id="auth">
-  <h2>Welcome to Leaka 💜</h2>
-  <p>Join the community or sign in.</p>
 
-  <input type="email" id="email" placeholder="Your email">
+        <div class="moments-row">
+          <div class="moment">＋<small>Your story</small></div>
+          <div class="moment">✦<small>Friends</small></div>
+          <div class="moment">✧<small>Discover</small></div>
+          <div class="moment">♡<small>Community</small></div>
+        </div>
+      </section>
 
-  <input type="password" id="password" placeholder="Your password">
-
-  <button id="signupBtn">Create account</button>
-  <button id="loginBtn">Log in</button>
-
-  <button id="logoutBtn" hidden>Log out</button>
-
-  <p id="authMessage"></p>
-</section>
-
+      <!-- CREATE POST -->
       <section class="create-card" id="create">
-        <h3>Create something</h3>
+        <h3>Create something ✨</h3>
+
         <textarea id="caption" placeholder="What's happening?"></textarea>
 
         <div class="upload-row">
@@ -66,66 +71,90 @@
             ＋ Add photo/video
             <input type="file" id="mediaInput" accept="image/*,video/*" hidden>
           </label>
+
           <button id="postBtn" class="post-btn">Publish ↗</button>
         </div>
 
         <div id="preview"></div>
       </section>
 
+      <!-- FEED -->
       <section class="feed-section" id="feed">
         <div class="section-heading">
           <div>
             <h2>Your feed</h2>
-            <p>See what people are sharing.</p>
+            <p>Little moments. Big memories.</p>
           </div>
-          <span class="live-dot">● LIVE FEED</span>
+          <span class="live-dot">● LIVE</span>
         </div>
 
         <div id="posts">
           <div class="empty-state">
             <div>✦</div>
-            <h3>Your feed starts here</h3>
+            <h3>Your story starts here</h3>
             <p>Be the first to share something.</p>
           </div>
         </div>
       </section>
 
-      <section class="extra-section" id="messages">
-        <h2>Messages</h2>
-        <p>Private messaging is coming soon.</p>
+      <!-- REELS -->
+      <section class="extra-section" id="reels">
+        <h2>LEAKA Reels ✨</h2>
+        <p>Short videos, creative moments and things worth watching.</p>
+        <div class="coming-soon">VIDEO EXPERIENCES COMING SOON</div>
       </section>
 
+      <!-- MESSAGES -->
+      <section class="extra-section" id="messages">
+        <h2>Your private space 💌</h2>
+        <p>Your private conversations will live here.</p>
+        <div class="coming-soon">PRIVATE CHATS COMING SOON</div>
+      </section>
+
+      <!-- PROFILE -->
       <section class="extra-section" id="profile">
+        <div class="profile-avatar">U</div>
         <h2>Your profile</h2>
-        <p>Your personal space on Leaka.</p>
+        <p>Your identity. Your moments. Your community.</p>
+        <button id="logoutBtnProfile">Log out</button>
       </section>
 
     </main>
 
-    <aside class="rightbar">
-      <div class="right-card">
-        <h3>About Leaka</h3>
-        <p>A place to share your moments, meet people and express yourself.</p>
-      </div>
+    <!-- BOTTOM NAVIGATION -->
+    <nav class="bottom-nav">
+      <a href="#home" class="nav-item active">
+        <span>⌂</span>
+        <small>Home</small>
+      </a>
 
-      <div class="right-card">
-        <h3>Community</h3>
-        <p>Be respectful. Be creative. Be yourself.</p>
-      </div>
+      <a href="#reels" class="nav-item">
+        <span>▷</span>
+        <small>Reels</small>
+      </a>
 
-      <div class="right-card">
-        <h3>Coming soon</h3>
-        <p>Profiles, followers, private chats and more.</p>
-      </div>
-    </aside>
+      <a href="#create" class="nav-item create-nav">
+        <span>＋</span>
+        <small>Create</small>
+      </a>
+
+      <a href="#messages" class="nav-item">
+        <span>✉</span>
+        <small>Chats</small>
+      </a>
+
+      <a href="#profile" class="nav-item">
+        <span>♙</span>
+        <small>Profile</small>
+      </a>
+    </nav>
 
   </div>
 
-  <footer>
-    © 2026 Leaka. Made for everyone.
-  </footer>
+  <footer>© 2026 LEAKA. Made for everyone. 💜</footer>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="app.js"></script>
+  <script src="app.js"></script>
+
 </body>
 </html>
