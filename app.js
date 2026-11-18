@@ -555,8 +555,9 @@ async function loadPosts() {
     if (error) throw error;
 
     allPosts = data || [];
-    renderPosts();
-    renderProfilePosts();
+await loadLikes();
+renderPosts();
+renderProfilePosts();
 
   } catch (error) {
     $("posts").textContent = "Could not load posts: " + error.message;
