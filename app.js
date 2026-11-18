@@ -1,3 +1,4 @@
+
 /* =========================================
    LEAKA — FULL APP + SUPABASE
 ========================================= */
@@ -201,6 +202,7 @@ $("saveProfileBtn").addEventListener("click", () => {
 
 async function uploadMedia(file, folder = "posts") {
   const extension = file.name.split(".").pop();
+
   const path =
     currentUser.id + "/" + folder + "/" +
     Date.now() + "." + extension;
@@ -236,16 +238,17 @@ $("signupBtn").addEventListener("click", async () => {
 
   const btn = $("signupBtn");
   btn.disabled = true;
+
   message("authMessage", "Creating account...");
 
   try {
     const { data, error } = await supabaseClient.auth.signUp({
-  email,
-  password,
-  options: {
-    emailRedirectTo: "https://credos160-ship-it.github.io/Leaka/"
-  }
-});
+      email,
+      password,
+      options: {
+        emailRedirectTo: "https://credos160-ship-it.github.io/Leaka/"
+      }
+    });
 
     if (error) throw error;
 
@@ -255,6 +258,7 @@ $("signupBtn").addEventListener("click", async () => {
         ? "Welcome to LEAKA! 💜"
         : "Account created! Check your email to confirm."
     );
+
   } catch (error) {
     message("authMessage", error.message);
   } finally {
@@ -273,6 +277,7 @@ $("loginBtn").addEventListener("click", async () => {
 
   const btn = $("loginBtn");
   btn.disabled = true;
+
   message("authMessage", "Logging in...");
 
   try {
@@ -284,6 +289,7 @@ $("loginBtn").addEventListener("click", async () => {
     if (error) throw error;
 
     message("authMessage", "Welcome back! 💜");
+
   } catch (error) {
     message("authMessage", error.message);
   } finally {
@@ -293,6 +299,7 @@ $("loginBtn").addEventListener("click", async () => {
 
 async function logout() {
   const { error } = await supabaseClient.auth.signOut();
+
   if (error) alert(error.message);
 }
 
@@ -308,6 +315,7 @@ let handlingAuth = false;
 
 async function updateAuthUI(session) {
   if (handlingAuth) return;
+
   handlingAuth = true;
 
   try {
@@ -326,8 +334,11 @@ async function updateAuthUI(session) {
       await loadPosts();
     } else {
       allPosts = [];
+      allLikes = [];
+
       $("posts").replaceChildren();
     }
+
   } finally {
     handlingAuth = false;
   }
@@ -335,6 +346,7 @@ async function updateAuthUI(session) {
 
 supabaseClient.auth.onAuthStateChange((event, session) => {
   if (event === "INITIAL_SESSION") return;
+
   setTimeout(() => updateAuthUI(session), 0);
 });
 
@@ -356,8 +368,9 @@ initializeApp();
 ========================================= */
 
 document.querySelectorAll("[data-page]").forEach(button => {
-  button.addEventListener("click", (e) => {
+  button.addEventListener("click", e => {
     e.preventDefault();
+
     showPage(button.dataset.page, button.dataset.scroll);
   });
 });
@@ -370,9 +383,11 @@ $("profileBtn").addEventListener("click", () => showPage("profile"));
 
 $("avatarInput").addEventListener("change", async event => {
   const file = event.target.files[0];
+
   if (!file) return;
 
-  if (!file.type.startsWith("image/") || file.size > 2 * 1024 * 1024) {
+  if (!file.type.startsWith("image/") ||
+      file.size > 2 * 1024 * 1024) {
     alert("Choose an image smaller than 2MB.");
     event.target.value = "";
     return;
@@ -380,9 +395,12 @@ $("avatarInput").addEventListener("change", async event => {
 
   try {
     const url = await uploadMedia(file, "avatars");
+
     profile.avatar = url;
     saveProfile();
+
     message("profileMessage", "Profile picture updated! 💜");
+
   } catch (error) {
     alert("Avatar upload failed: " + error.message);
   }
@@ -397,6 +415,7 @@ const coverInput = $("coverInput");
 if (coverInput) {
   coverInput.addEventListener("change", async event => {
     const file = event.target.files[0];
+
     if (!file) return;
 
     if (!file.type.startsWith("image/")) {
@@ -415,10 +434,12 @@ if (coverInput) {
 
     try {
       const url = await uploadMedia(file, "covers");
+
       profile.cover = url;
       saveProfile();
 
       message("profileMessage", "Cover photo updated! 💜");
+
     } catch (error) {
       alert("Cover upload failed: " + error.message);
     }
@@ -480,6 +501,7 @@ $("postBtn").addEventListener("click", async () => {
   }
 
   const btn = $("postBtn");
+
   btn.disabled = true;
   btn.textContent = "Publishing...";
 
@@ -489,6 +511,7 @@ $("postBtn").addEventListener("click", async () => {
 
     if (selectedMedia) {
       mediaUrl = await uploadMedia(selectedMedia);
+
       mediaType = selectedMedia.type.startsWith("video/")
         ? "video"
         : "image";
@@ -506,13 +529,16 @@ $("postBtn").addEventListener("click", async () => {
     $("caption").value = "";
     $("mediaInput").value = "";
     $("preview").replaceChildren();
+
     selectedMedia = null;
 
     alert("Post published! 💜");
+
     await loadPosts();
 
   } catch (error) {
     alert("Publishing failed: " + error.message);
+
   } finally {
     btn.disabled = false;
     btn.textContent = "Publish ↗";
@@ -555,12 +581,15 @@ async function loadPosts() {
     if (error) throw error;
 
     allPosts = data || [];
-await loadLikes();
-renderPosts();
-renderProfilePosts();
+
+    await loadLikes();
+
+    renderPosts();
+    renderProfilePosts();
 
   } catch (error) {
-    $("posts").textContent = "Could not load posts: " + error.message;
+    $("posts").textContent =
+      "Could not load posts: " + error.message;
   }
 }
 
@@ -569,6 +598,8 @@ renderProfilePosts();
 ========================================= */
 
 async function toggleLike(postId) {
+  if (!currentUser) return;
+
   const existingLike = allLikes.find(
     like =>
       like.post_id === postId &&
@@ -597,6 +628,7 @@ async function toggleLike(postId) {
     }
 
     await loadLikes();
+
     renderPosts();
     renderProfilePosts();
 
@@ -604,7 +636,6 @@ async function toggleLike(postId) {
     alert("Like failed: " + error.message);
   }
 }
-
 
 /* =========================================
    DISPLAY POSTS
@@ -615,7 +646,11 @@ function createPostElement(post) {
   article.className = "post-card";
 
   const owner = post.user_id === currentUser.id;
-  const name = owner ? (profile.name || "You") : "LEAKA member";
+  const name = owner
+    ? (profile.name || "You")
+    : "LEAKA member";
+
+  // POST HEADER
 
   const header = document.createElement("div");
   header.className = "post-header";
@@ -639,30 +674,17 @@ function createPostElement(post) {
   header.append(avatar, info);
   article.append(header);
 
+  // POST CAPTION
+
   if (post.caption) {
     const caption = document.createElement("p");
     caption.className = "post-caption";
     caption.textContent = post.caption;
+
     article.append(caption);
- const likeBtn = document.createElement("button");
-  likeBtn.className = "action-btn";
-
-  const postLikes = allLikes.filter(
-    like => like.post_id === post.id
-  );
-
-  const likedByMe = postLikes.some(
-    like => like.user_id === currentUser.id
-  );
-
-  likeBtn.textContent = `${likedByMe ? "❤️" : "🤍"} ${postLikes.length} Likes`;
-
-  likeBtn.addEventListener("click", () => {
-    toggleLike(post.id);
-  });
-
-  article.appendChild(likeBtn);
   }
+
+  // POST MEDIA
 
   if (post.media_url) {
     const media = document.createElement(
@@ -682,6 +704,30 @@ function createPostElement(post) {
     article.append(media);
   }
 
+  // LIKE BUTTON
+
+  const likeBtn = document.createElement("button");
+  likeBtn.className = "action-btn";
+
+  const postLikes = allLikes.filter(
+    like => like.post_id === post.id
+  );
+
+  const likedByMe = postLikes.some(
+    like => like.user_id === currentUser.id
+  );
+
+  likeBtn.textContent =
+    `${likedByMe ? "❤️" : "🤍"} ${postLikes.length} Likes`;
+
+  likeBtn.addEventListener("click", () => {
+    toggleLike(post.id);
+  });
+
+  article.appendChild(likeBtn);
+
+  // OWNER ACTIONS
+
   if (owner) {
     const actions = document.createElement("div");
     actions.className = "post-actions";
@@ -689,11 +735,13 @@ function createPostElement(post) {
     const edit = document.createElement("button");
     edit.className = "action-btn";
     edit.textContent = "✎ Edit";
+
     edit.addEventListener("click", () => editPost(post));
 
     const del = document.createElement("button");
     del.className = "action-btn";
     del.textContent = "🗑 Delete";
+
     del.addEventListener("click", () => deletePost(post));
 
     actions.append(edit, del);
@@ -702,6 +750,10 @@ function createPostElement(post) {
 
   return article;
 }
+
+/* =========================================
+   RENDER POSTS
+========================================= */
 
 function renderPosts() {
   $("posts").replaceChildren();
@@ -732,7 +784,11 @@ function renderPosts() {
 async function editPost(post) {
   if (post.user_id !== currentUser.id) return;
 
-  const caption = prompt("Edit your caption:", post.caption || "");
+  const caption = prompt(
+    "Edit your caption:",
+    post.caption || ""
+  );
+
   if (caption === null) return;
 
   try {
@@ -745,7 +801,9 @@ async function editPost(post) {
     if (error) throw error;
 
     await loadPosts();
+
     alert("Post updated! 💜");
+
   } catch (error) {
     alert(error.message);
   }
@@ -757,6 +815,7 @@ async function editPost(post) {
 
 async function deletePost(post) {
   if (post.user_id !== currentUser.id) return;
+
   if (!confirm("Permanently delete this post?")) return;
 
   try {
@@ -769,7 +828,9 @@ async function deletePost(post) {
     if (error) throw error;
 
     await loadPosts();
+
     alert("Post deleted.");
+
   } catch (error) {
     alert(error.message);
   }
@@ -783,11 +844,14 @@ function renderProfilePosts() {
   if (!currentUser) return;
 
   const container = $("profilePosts");
+
   if (!container) return;
 
   container.replaceChildren();
 
-  let own = allPosts.filter(p => p.user_id === currentUser.id);
+  let own = allPosts.filter(
+    p => p.user_id === currentUser.id
+  );
 
   $("postCount").textContent = own.length;
 
@@ -807,6 +871,7 @@ function renderProfilePosts() {
         <p>Your shared moments will appear here.</p>
       </div>
     `;
+
     return;
   }
 
@@ -817,12 +882,15 @@ function renderProfilePosts() {
 
 document.querySelectorAll("[data-profile-tab]").forEach(button => {
   button.addEventListener("click", () => {
+
     document.querySelectorAll("[data-profile-tab]").forEach(tab => {
       tab.classList.remove("selected");
     });
 
     button.classList.add("selected");
+
     profilePostsTab = button.dataset.profileTab;
+
     renderProfilePosts();
   });
 });
@@ -835,9 +903,10 @@ $("search").addEventListener("input", event => {
   const query = event.target.value.toLowerCase();
 
   document.querySelectorAll("#posts .post-card").forEach(post => {
-    post.style.display = post.textContent.toLowerCase().includes(query)
-      ? ""
-      : "none";
+    post.style.display =
+      post.textContent.toLowerCase().includes(query)
+        ? ""
+        : "none";
   });
 });
 
