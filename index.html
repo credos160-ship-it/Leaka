@@ -1,0 +1,131 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#09090f">
+  <title>Leaka - Your Social Space</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <header class="topbar">
+    <a href="#" class="logo">lea<span>ka.</span></a>
+    <input type="search" id="search" placeholder="Search Leaka...">
+    <button class="avatar" id="profileBtn">U</button>
+  </header>
+
+  <div class="layout">
+
+    <aside class="sidebar">
+      <h3>MENU</h3>
+      <a class="active" href="#">⌂ &nbsp; Home</a>
+      <a href="#create">＋ &nbsp; Create post</a>
+      <a href="#feed">◉ &nbsp; Explore</a>
+      <a href="#messages">✉ &nbsp; Messages</a>
+      <a href="#profile">♙ &nbsp; My profile</a>
+
+      <div class="sidebar-bottom">
+        <p>YOUR SPACE.</p>
+        <small>Connect. Share. Discover.</small>
+      </div>
+    </aside>
+
+    <main class="main-content">
+
+      <section class="welcome">
+        <div>
+          <p class="eyebrow">YOUR WORLD. YOUR PEOPLE.</p>
+          <h1>Welcome to <span>Leaka.</span></h1>
+          <p>Discover what's happening around you.</p>
+        </div>
+       </section>
+       <section class="auth-card" id="auth">
+  <h2>Welcome to Leaka 💜</h2>
+  <p>Join the community or sign in.</p>
+
+  <input type="email" id="email" placeholder="Your email">
+
+  <input type="password" id="password" placeholder="Your password">
+
+  <button id="signupBtn">Create account</button>
+  <button id="loginBtn">Log in</button>
+
+  <button id="logoutBtn" hidden>Log out</button>
+
+  <p id="authMessage"></p>
+</section>
+
+      <section class="create-card" id="create">
+        <h3>Create something</h3>
+        <textarea id="caption" placeholder="What's happening?"></textarea>
+
+        <div class="upload-row">
+          <label class="upload-btn">
+            ＋ Add photo/video
+            <input type="file" id="mediaInput" accept="image/*,video/*" hidden>
+          </label>
+          <button id="postBtn" class="post-btn">Publish ↗</button>
+        </div>
+
+        <div id="preview"></div>
+      </section>
+
+      <section class="feed-section" id="feed">
+        <div class="section-heading">
+          <div>
+            <h2>Your feed</h2>
+            <p>See what people are sharing.</p>
+          </div>
+          <span class="live-dot">● LIVE FEED</span>
+        </div>
+
+        <div id="posts">
+          <div class="empty-state">
+            <div>✦</div>
+            <h3>Your feed starts here</h3>
+            <p>Be the first to share something.</p>
+          </div>
+        </div>
+      </section>
+
+      <section class="extra-section" id="messages">
+        <h2>Messages</h2>
+        <p>Private messaging is coming soon.</p>
+      </section>
+
+      <section class="extra-section" id="profile">
+        <h2>Your profile</h2>
+        <p>Your personal space on Leaka.</p>
+      </section>
+
+    </main>
+
+    <aside class="rightbar">
+      <div class="right-card">
+        <h3>About Leaka</h3>
+        <p>A place to share your moments, meet people and express yourself.</p>
+      </div>
+
+      <div class="right-card">
+        <h3>Community</h3>
+        <p>Be respectful. Be creative. Be yourself.</p>
+      </div>
+
+      <div class="right-card">
+        <h3>Coming soon</h3>
+        <p>Profiles, followers, private chats and more.</p>
+      </div>
+    </aside>
+
+  </div>
+
+  <footer>
+    © 2026 Leaka. Made for everyone.
+  </footer>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="app.js"></script>
+</body>
+</html>
