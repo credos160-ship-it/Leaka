@@ -292,8 +292,6 @@ async function logout() {
   if (error) alert(error.message);
 }
 
-$("logoutBtn").addEventListener("click", logout);
-
 $("settingsLogoutBtn").addEventListener("click", () => {
   if (confirm("Are you sure you want to log out?")) logout();
 });
@@ -350,11 +348,12 @@ async function initializeApp() {
 initializeApp();
 
 /* =========================================
-   NAVIGATION
+   NAVIGATION & BUTTON HANDLERS
 ========================================= */
 
 document.querySelectorAll("[data-page]").forEach(button => {
-  button.addEventListener("click", () => {
+  button.addEventListener("click", (e) => {
+    e.preventDefault();
     showPage(button.dataset.page, button.dataset.scroll);
   });
 });
@@ -387,7 +386,6 @@ $("avatarInput").addEventListener("change", async event => {
 
 /* =========================================
    COVER PHOTO UPLOAD
-   One input only: coverInput
 ========================================= */
 
 const coverInput = $("coverInput");
