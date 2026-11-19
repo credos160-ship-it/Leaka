@@ -1280,3 +1280,30 @@ footer {
     font-size: 9px;
   }
 }
+/* LEAKA USER SEARCH */
+
+.search-results {
+  background: #130e1d;
+  border: 1px solid #30213f;
+  border-radius: 14px;
+  margin-top: 8px;
+  overflow: hidden;
+}
+
+.search-user {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px;
+  border-bottom: 1px solid #30213f;
+  color: white;
+  cursor: pointer;
+}
+
+.search-user:hover {
+  background: #241832;
+}
+
+.search-user:last-child {
+  border-bottom: none;
+}
