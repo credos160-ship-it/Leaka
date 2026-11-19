@@ -10,70 +10,475 @@
   <link rel="stylesheet" href="style.css">
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+  <style>
+    [hidden] {
+      display: none !important;
+    }
+  </style>
 </head>
 
 <body>
 
+  <!-- AUTHENTICATION -->
   <div id="auth">
     <div class="auth-container">
-      <h1>LEAKA</h1>
+      <div class="auth-logo">LEAKA</div>
       <p>Connect freely. Express yourself.</p>
 
-      <input id="email" type="email" placeholder="Email address">
-      <input id="password" type="password" placeholder="Password">
+      <div class="auth-form">
+        <input
+          id="email"
+          type="email"
+          placeholder="Email address"
+          autocomplete="email"
+        >
 
-      <button id="loginBtn" type="button" onclick="login()">Log In</button>
-      <button id="signupBtn" type="button" onclick="signUp()">Create Account</button>
+        <input
+          id="password"
+          type="password"
+          placeholder="Password"
+          autocomplete="current-password"
+        >
 
-      <p id="authMessage"></p>
+        <button id="loginBtn" type="button">
+          Log In
+        </button>
+
+        <button id="signupBtn" type="button">
+          Create Account
+        </button>
+
+        <p id="authMessage"></p>
+      </div>
     </div>
   </div>
 
-  <div id="appContent" style="display:none;">
 
-    <header>
-      <h2>LEAKA</h2>
+  <!-- MAIN APPLICATION -->
+  <div id="appContent" hidden>
+
+    <!-- TOP HEADER -->
+    <header class="top-header">
+      <div class="header-logo">LEAKA</div>
+
+      <div class="header-actions">
+        <button id="profileBtn" type="button" aria-label="My profile">
+          U
+        </button>
+
+        <button id="settingsGear" type="button" aria-label="Settings">
+          ⚙
+        </button>
+      </div>
     </header>
 
+
+    <!-- MAIN PAGES -->
     <main>
-      <section id="feed" class="page">
-        <h2>Home</h2>
-        <div id="stories"></div>
+
+      <!-- HOME FEED -->
+      <section id="feed" class="page active">
+
+        <div class="page-heading">
+          <h2>Home</h2>
+          <p>Your world, your people.</p>
+        </div>
+
+        <!-- STORIES -->
+        <div class="stories-section">
+          <div class="section-heading">
+            <h3>Stories</h3>
+          </div>
+
+          <div id="storiesContainer" class="stories-container">
+          </div>
+
+          <input
+            id="storyInput"
+            type="file"
+            accept="image/*,video/*"
+            hidden
+          >
+        </div>
+
+
+        <!-- CREATE POST -->
+        <div class="create-post-card">
+
+          <div class="create-post-heading">
+            <h3>Create a post</h3>
+          </div>
+
+          <textarea
+            id="caption"
+            placeholder="What's happening?"
+            rows="3"
+          ></textarea>
+
+          <div id="preview" class="media-preview"></div>
+
+          <div class="create-post-actions">
+            <label for="mediaInput" class="media-select">
+              ＋ Photo / Video
+            </label>
+
+            <input
+              id="mediaInput"
+              type="file"
+              accept="image/*,video/*"
+              hidden
+            >
+
+            <button id="postBtn" type="button">
+              Publish ↗
+            </button>
+          </div>
+
+        </div>
+
+
+        <!-- POSTS -->
+        <div class="feed-heading">
+          <h3>Latest Posts</h3>
+        </div>
+
         <div id="posts"></div>
+
       </section>
 
-      <section id="searchPage" class="page" style="display:none;">
-        <h2>Discover</h2>
-        <input id="searchInput" placeholder="Search users...">
-        <div id="searchResults"></div>
+
+      <!-- DISCOVER / SEARCH -->
+      <section id="searchPage" class="page" hidden>
+
+        <div class="page-heading">
+          <h2>Discover</h2>
+          <p>Find your people.</p>
+        </div>
+
+        <div class="search-container">
+          <input
+            id="search"
+            type="search"
+            placeholder="Search usernames or people..."
+            autocomplete="off"
+          >
+
+          <div id="searchResults"></div>
+        </div>
+
       </section>
 
-      <section id="profile" class="page" style="display:none;">
-        <div id="profileInfo"></div>
-        <div id="profilePosts"></div>
+
+      <!-- MY PROFILE -->
+      <section id="profile" class="page" hidden>
+
+        <!-- COVER -->
+        <div class="profile-cover">
+          <img
+            id="profileCoverImage"
+            alt="Profile cover"
+            hidden
+          >
+
+          <div class="profile-cover-content">
+            <span>My Profile</span>
+          </div>
+        </div>
+
+
+        <!-- PROFILE INFORMATION -->
+        <div class="profile-main">
+
+          <div class="profile-top">
+
+            <div id="profileAvatar" class="profile-avatar">
+              U
+            </div>
+
+            <button id="editProfileToggle" type="button">
+              ✏️ Edit Profile
+            </button>
+
+          </div>
+
+          <h2 id="profileName">LEAKA User</h2>
+          <p id="profileEmail">@username</p>
+          <p id="profileBio">
+            Welcome to my LEAKA space 💜
+          </p>
+
+
+          <!-- PROFILE STATISTICS -->
+          <div class="profile-stats">
+
+            <div class="profile-stat">
+              <strong id="postCount">0</strong>
+              <span>Posts</span>
+            </div>
+
+            <div class="profile-stat">
+              <strong id="followerCount">0</strong>
+              <span>Followers</span>
+            </div>
+
+            <div class="profile-stat">
+              <strong id="followingCount">0</strong>
+              <span>Following</span>
+            </div>
+
+          </div>
+
+
+          <!-- PROFILE EDITOR -->
+          <div id="profileEditSection" hidden>
+
+            <h3>Edit Profile</h3>
+
+            <div class="edit-avatar-section">
+              <div id="editAvatar" class="profile-avatar">
+                U
+              </div>
+
+              <label for="avatarInput">
+                Change Profile Picture
+              </label>
+
+              <input
+                id="avatarInput"
+                type="file"
+                accept="image/*"
+                hidden
+              >
+            </div>
+
+
+            <div class="edit-cover-section">
+
+              <label for="coverInput">
+                Change Cover Photo
+              </label>
+
+              <input
+                id="coverInput"
+                type="file"
+                accept="image/*"
+                hidden
+              >
+
+              <div id="editCoverPreview"></div>
+
+            </div>
+
+
+            <div class="profile-edit-fields">
+
+              <label for="displayName">
+                Display Name
+              </label>
+
+              <input
+                id="displayName"
+                type="text"
+                placeholder="Your display name"
+              >
+
+              <label for="bioInput">
+                Bio
+              </label>
+
+              <textarea
+                id="bioInput"
+                placeholder="Tell people about yourself..."
+                rows="3"
+              ></textarea>
+
+              <button id="saveProfileBtn" type="button">
+                Save Changes
+              </button>
+
+            </div>
+
+          </div>
+
+
+          <!-- PROFILE TABS -->
+          <div class="profile-tabs">
+
+            <button
+              type="button"
+              class="selected"
+              data-profile-tab="posts"
+            >
+              Posts
+            </button>
+
+            <button
+              type="button"
+              data-profile-tab="videos"
+            >
+              Videos
+            </button>
+
+            <button
+              type="button"
+              data-profile-tab="liked"
+            >
+              Liked
+            </button>
+
+          </div>
+
+
+          <!-- MY POSTS -->
+          <div id="profilePosts" class="profile-posts"></div>
+
+        </div>
+
       </section>
 
-      <section id="notifications" class="page" style="display:none;">
-        <h2>Notifications</h2>
-        <div id="notificationList"></div>
+
+      <!-- NOTIFICATIONS -->
+      <section id="notifications" class="page" hidden>
+
+        <div class="page-heading">
+          <h2>Notifications</h2>
+          <p>Stay up to date.</p>
+        </div>
+
+        <button id="markAllRead" type="button">
+          Mark all as read
+        </button>
+
+        <div id="notificationsList"></div>
+
       </section>
 
-      <section id="settings" class="page" style="display:none;">
-        <h2>Settings</h2>
-        <button type="button" onclick="logout()">Log Out</button>
+
+      <!-- SETTINGS -->
+      <section id="settings" class="page" hidden>
+
+        <div class="page-heading">
+          <h2>Settings</h2>
+          <p>Manage your LEAKA account.</p>
+        </div>
+
+
+        <!-- ACCOUNT -->
+        <div class="settings-section">
+          <h3>Account</h3>
+
+          <div class="setting-item">
+            <span>Email address</span>
+            <strong id="accountEmail">Loading...</strong>
+          </div>
+
+          <div class="setting-item">
+            <span>Display name</span>
+            <strong id="accountDisplayName">Loading...</strong>
+          </div>
+        </div>
+
+
+        <!-- PRIVACY -->
+        <div class="settings-section">
+          <h3>Privacy</h3>
+
+          <label class="privacy-setting">
+            <span>
+              <strong>Private Account</strong>
+              <small>Only approved followers can see your posts.</small>
+            </span>
+
+            <input
+              id="privateAccount"
+              type="checkbox"
+            >
+          </label>
+        </div>
+
+
+        <!-- FOLLOW REQUESTS -->
+        <div class="settings-section">
+          <h3>Follow Requests</h3>
+
+          <div id="followRequestsList">
+            <p class="muted">
+              No pending follow requests.
+            </p>
+          </div>
+        </div>
+
+
+        <!-- LOGOUT -->
+        <div class="settings-section">
+          <h3>Session</h3>
+
+          <button id="settingsLogoutBtn" type="button">
+            Log Out
+          </button>
+
+          <button id="logoutBtn" type="button" hidden>
+            Log Out
+          </button>
+        </div>
+
       </section>
+
     </main>
 
-    <nav id="bottomNav">
-      <button type="button" onclick="showPage('feed')">Home</button>
-      <button type="button" onclick="showPage('searchPage')">Discover</button>
-      <button type="button" onclick="showPage('profile')">Profile</button>
-      <button type="button" onclick="showPage('notifications')">Notifications</button>
-      <button type="button" onclick="showPage('settings')">Settings</button>
+
+    <!-- BOTTOM NAVIGATION -->
+    <nav id="bottomNav" class="bottom-nav">
+
+      <button
+        type="button"
+        class="active"
+        data-page="feed"
+      >
+        <span>⌂</span>
+        <small>Home</small>
+      </button>
+
+      <button
+        type="button"
+        data-page="searchPage"
+      >
+        <span>⌕</span>
+        <small>Discover</small>
+      </button>
+
+      <button
+        type="button"
+        data-page="profile"
+      >
+        <span>◉</span>
+        <small>Profile</small>
+      </button>
+
+      <button
+        type="button"
+        data-page="notifications"
+      >
+        <span>♡</span>
+        <small>Activity</small>
+        <span id="notificationBadge" hidden>0</span>
+      </button>
+
+      <button
+        type="button"
+        data-page="settings"
+      >
+        <span>⚙</span>
+        <small>Settings</small>
+      </button>
+
     </nav>
 
   </div>
 
+
+  <!-- MAIN JAVASCRIPT -->
   <script src="script.js"></script>
 
 </body>
