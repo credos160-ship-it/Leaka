@@ -1658,3 +1658,91 @@ $("privateAccount")?.addEventListener("change", async event => {
 // =========================================
 
 checkSession();
+
+/* =====================================
+   LEAKA — NEW CREATE MENU + NAVIGATION
+===================================== */
+
+const createToggle = document.getElementById("createToggle");
+const createMenu = document.getElementById("createMenu");
+const menuStoryBtn = document.getElementById("menuStoryBtn");
+const menuPostBtn = document.getElementById("menuPostBtn");
+const createPostCard = document.getElementById("createPostCard");
+const closeCreatePost = document.getElementById("closeCreatePost");
+
+// Open and close the plus menu
+createToggle?.addEventListener("click", () => {
+  createMenu.hidden = !createMenu.hidden;
+});
+
+// Close menu when clicking outside
+document.addEventListener("click", event => {
+  if (
+    createMenu &&
+    !createMenu.hidden &&
+    !createMenu.contains(event.target) &&
+    !createToggle.contains(event.target)
+  ) {
+    createMenu.hidden = true;
+  }
+});
+
+// Add story
+menuStoryBtn?.addEventListener("click", () => {
+  createMenu.hidden = true;
+  document.getElementById("createStoryBtn")?.click();
+});
+
+// Create post
+menuPostBtn?.addEventListener("click", () => {
+  createMenu.hidden = true;
+
+  showPage("feed");
+
+  createPostCard.hidden = false;
+
+  setTimeout(() => {
+    createPostCard.scrollIntoView({
+      behavior: "smooth",
+      block: "center"
+    });
+
+    document.getElementById("caption")?.focus();
+  }, 150);
+});
+
+// Close post creator
+closeCreatePost?.addEventListener("click", () => {
+  createPostCard.hidden = true;
+});
+
+// Hide creator after successful publishing
+const originalPostButton = document.getElementById("postBtn");
+
+originalPostButton?.addEventListener("click", () => {
+  setTimeout(() => {
+    const caption = document.getElementById("caption");
+
+    if (
+      caption &&
+      caption.value.trim() === "" &&
+      !document.getElementById("mediaInput").files.length
+    ) {
+      createPostCard.hidden = true;
+    }
+  }, 1000);
+});
+
+// Load follow requests when settings opens
+document.querySelectorAll('[data-page="settings"]').forEach(button => {
+  button.addEventListener("click", async () => {
+    const list = document.getElementById("followRequestsList");
+
+    if (list) {
+      await renderFollowRequests(list);
+    }
+
+    await loadPrivacySetting();
+  });
+});
+
