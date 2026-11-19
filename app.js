@@ -539,6 +539,31 @@ $("coverInput")?.addEventListener("change", async event => {
 
   notify("Cover photo updated 💜");
 });
+// =========================================
+// PROFILE EDITOR TOGGLE
+// =========================================
+
+$("editProfileToggle")?.addEventListener("click", () => {
+  const editor = $("profileEditSection");
+  const button = $("editProfileToggle");
+
+  if (!editor) return;
+
+  const opening = editor.hidden;
+
+  editor.hidden = !opening;
+
+  button.textContent = opening
+    ? "✕ Close Editor"
+    : "✏️ Edit Profile";
+
+  if (opening) {
+    editor.scrollIntoView({
+      behavior: "smooth",
+      block: "start"
+    });
+  }
+});
 
 // SAVE PROFILE
 
