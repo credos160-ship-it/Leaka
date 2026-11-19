@@ -991,13 +991,121 @@ on("createStoryBtn", "click", () => {
 ========================================= */
 
 console.log("LEAKA initialized successfully 💜");
+
 /* =========================================
    LEAKA — USER SEARCH SYSTEM
 ========================================= */
 
 let searchTimeout;
 
+async function openUserProfile(user) {
+
+  // Your own profile
+  if (user.id === currentUser?.id) {
+    showPage("profile");
+    return;
+  }
+
+  const app = $("appContent");
+
+  if (!app) return;
+
+  // Create the public profile page if needed
+  let page = $("publicProfilePage");
+
+  if (!page) {
+    page = document.createElement("section");
+    page.id = "publicProfilePage";
+    page.className = "page";
+    page.hidden = true;
+    app.appendChild(page);
+  }
+
+  page.replaceChildren();
+
+  // Back button
+  const back = document.createElement("button");
+  back.textContent = "← Back";
+  back.className = "action-btn";
+  back.addEventListener("click", () => showPage("home"));
+
+  // Profile information
+  const header = document.createElement("div");
+  header.style.padding = "25px";
+  header.style.textAlign = "center";
+
+  const avatar = document.createElement("div");
+  avatar.className = "search-user-avatar";
+  avatar.style.width = "90px";
+  avatar.style.height = "90px";
+  avatar.style.margin = "15px auto";
+
+  if (user.avatar_url) {
+    const img = document.createElement("img");
+    img.src = user.avatar_url;
+    img.alt = "Profile picture";
+    img.style.width = "100%";
+    img.style.height = "100%";
+    img.style.objectFit = "cover";
+    img.style.borderRadius = "50%";
+    avatar.appendChild(img);
+  } else {
+    avatar.textContent = (
+      user.display_name || user.username || "U"
+    ).charAt(0).toUpperCase();
+  }
+
+  const name = document.createElement("h2");
+  name.textContent = user.display_name || user.username;
+
+  const username = document.createElement("p");
+  username.textContent = "@" + user.username;
+
+  const postsTitle = document.createElement("h3");
+  postsTitle.textContent = "Posts";
+
+  const posts = document.createElement("div");
+  posts.id = "publicUserPosts";
+
+  header.append(avatar, name, username);
+
+  page.append(back, header, postsTitle, posts);
+
+  showPage("publicProfilePage");
+
+  posts.textContent = "Loading posts...";
+
+  // Load this user's posts
+  try {
+    const { data, error } = await supabaseClient
+      .from("posts")
+      .select("*")
+      .eq("user_id", user.id)
+      .order("created_at", { ascending: false });
+
+    if (error) throw error;
+
+    posts.replaceChildren();
+
+    if (!data || data.length === 0) {
+      posts.textContent = "This user hasn't posted anything yet.";
+      return;
+    }
+
+    data.forEach(post => {
+      posts.appendChild(createPostElement(post));
+    });
+
+  } catch (error) {
+    console.error("Public profile error:", error);
+    posts.textContent = "Could not load posts: " + error.message;
+  }
+}
+
+
+// Search accounts
 on("search", "input", event => {
+
   clearTimeout(searchTimeout);
 
   const query = event.target.value.trim().replace(/^@/, "");
@@ -1007,12 +1115,16 @@ on("search", "input", event => {
 
   results.replaceChildren();
 
-  if (query.length < 1) return;
+  if (query.length < 1) {
+    results.style.display = "none";
+    return;
+  }
 
   results.style.display = "block";
   results.textContent = "Searching LEAKA...";
 
   searchTimeout = setTimeout(async () => {
+
     try {
       const { data, error } = await supabaseClient
         .from("profiles")
@@ -1032,6 +1144,7 @@ on("search", "input", event => {
       }
 
       data.forEach(user => {
+
         const item = document.createElement("div");
         item.className = "search-user";
 
@@ -1048,8 +1161,9 @@ on("search", "input", event => {
           img.style.borderRadius = "50%";
           avatar.appendChild(img);
         } else {
-          avatar.textContent = (user.display_name || user.username || "U")
-            .charAt(0).toUpperCase();
+          avatar.textContent = (
+            user.display_name || user.username || "U"
+          ).charAt(0).toUpperCase();
         }
 
         const info = document.createElement("div");
@@ -1065,14 +1179,10 @@ on("search", "input", event => {
 
         item.addEventListener("click", () => {
           results.replaceChildren();
-
+          results.style.display = "none";
           $("search").value = "";
 
-          if (user.id === currentUser?.id) {
-            showPage("profile");
-          } else {
-            alert("Other user profiles are coming next! 💜");
-          }
+          openUserProfile(user);
         });
 
         results.appendChild(item);
@@ -1082,5 +1192,8 @@ on("search", "input", event => {
       console.error("LEAKA search error:", error);
       results.textContent = "Search error: " + error.message;
     }
+
   }, 300);
 });
+
+console.log("LEAKA user profiles enabled 💜");
