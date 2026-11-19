@@ -1745,35 +1745,151 @@ document.querySelectorAll("[data-profile-tab]")
     });
   });
 
-// =========================================
-// STORIES
-// =========================================
+ // =========================================
+ // LEAKA STORIES SYSTEM
+ // =========================================
 
-$("createStoryBtn")?.addEventListener("click", () => {
-  $("storyInput")?.click();
-});
+ async function loadStories() {
+   const container = $("storiesContainer");
 
-$("storyInput")?.addEventListener("change", async event => {
-  const file = event.target.files[0];
+   if (!container || !currentUser) return;
 
-  if (!file) return;
+   const { data, error } = await db
+     .from("stories")
+     .select("*")
+     .gt("expires_at", new Date().toISOString())
+     .order("created_at", { ascending: false });
 
-  if (
-    !file.type.startsWith("image/") &&
-    !file.type.startsWith("video/")
-  ) {
-    notify("Choose an image or video.", true);
-    return;
-  }
+   if (error) {
+     console.error("Stories error:", error);
+     return;
+   }
 
-  const url = await uploadMedia(file, "stories");
+   container.innerHTML = `
+     <button id="createStoryBtn"
+       class="story-create-button">
+       <span>＋</span>
+       <small>Add Story</small>
+     </button>
+   `;
 
-  if (!url) return;
+   $("createStoryBtn")?.addEventListener("click", () => {
+     $("storyInput")?.click();
+   });
 
-  notify("Story media uploaded 💜 Story publishing still needs a stories database feature.");
+   for (const story of data || []) {
+     const profile = await getProfile(story.user_id)
+       .catch(() => null);
 
-  event.target.value = "";
-});
+     const item = document.createElement("button");
+
+     item.className = "story-item";
+
+     item.innerHTML = `
+       <div class="story-ring">
+         <div class="story-avatar">
+           ${avatarHTML(
+             profile?.avatar_url,
+             profileName(profile)
+           )}
+         </div>
+       </div>
+
+       <small>
+         ${escapeHTML(profileName(profile))}
+       </small>
+     `;
+
+     item.addEventListener("click", () => {
+       openStory(story);
+     });
+
+     container.appendChild(item);
+   }
+ }
+
+ // CREATE STORY
+
+ $("storyInput")?.addEventListener("change", async event => {
+   const file = event.target.files[0];
+
+   if (!file || !currentUser) return;
+
+   if (
+     !file.type.startsWith("image/") &&
+     !file.type.startsWith("video/")
+   ) {
+     notify("Choose an image or video.", true);
+     return;
+   }
+
+   if (file.size > 25 * 1024 * 1024) {
+     notify("Maximum file size is 25MB.", true);
+     return;
+   }
+
+   notify("Uploading your story...");
+
+   try {
+     const url = await uploadMedia(file, "stories");
+
+     if (!url) return;
+
+     const mediaType = file.type.startsWith("video/")
+       ? "video"
+       : "image";
+
+     const { error } = await db
+       .from("stories")
+       .insert({
+         user_id: currentUser.id,
+         media_url: url,
+         media_type: mediaType
+       });
+
+     if (error) throw error;
+
+     notify("Your story is live! 💜");
+
+     await loadStories();
+
+   } catch (error) {
+     console.error(error);
+     notify("Story publishing failed: " + error.message, true);
+   } finally {
+     event.target.value = "";
+   }
+ });
+
+ // OPEN STORY VIEWER
+
+ function openStory(story) {
+   let viewer = $("storyViewer");
+
+   if (!viewer) {
+     viewer = document.createElement("div");
+     viewer.id = "storyViewer";
+     document.body.appendChild(viewer);
+   }
+
+   const media = story.media_type === "video"
+     ? `<video src="${escapeHTML(story.media_url)}"
+          autoplay controls playsinline></video>`
+     : `<img src="${escapeHTML(story.media_url)}" alt="Story">`;
+
+   viewer.innerHTML = `
+     <button class="story-close"
+       onclick="document.getElementById('storyViewer').hidden=true">
+       ×
+     </button>
+
+     <div class="story-viewer-content">
+       ${media}
+     </div>
+   `;
+
+   viewer.hidden = false;
+ }
 
 // =========================================
 // PRIVACY
