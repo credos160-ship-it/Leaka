@@ -991,3 +991,60 @@ on("createStoryBtn", "click", () => {
 ========================================= */
 
 console.log("LEAKA initialized successfully 💜");
+/* =========================================
+   LEAKA — SEARCH USERS
+========================================= */
+
+let searchTimeout;
+
+on("search", "input", event => {
+  clearTimeout(searchTimeout);
+
+  const query = event.target.value.trim();
+  const results = $("searchResults");
+
+  if (!results) return;
+
+  results.replaceChildren();
+
+  if (query.length < 2) return;
+
+  results.textContent = "Searching LEAKA...";
+
+  searchTimeout = setTimeout(async () => {
+    try {
+      const { data, error } = await supabaseClient
+        .from("profiles")
+        .select("id, username, display_name")
+        .or(`username.ilike.%${query}%,display_name.ilike.%${query}%`)
+        .limit(10);
+
+      if (error) throw error;
+
+      results.replaceChildren();
+
+      if (!data || data.length === 0) {
+        results.textContent = "No LEAKA users found.";
+        return;
+      }
+
+      data.forEach(user => {
+        const item = document.createElement("div");
+        item.className = "search-user";
+
+        const name = document.createElement("strong");
+        name.textContent = user.display_name || user.username;
+
+        const username = document.createElement("span");
+        username.textContent = "@" + user.username;
+
+        item.append(name, username);
+        results.appendChild(item);
+      });
+
+    } catch (error) {
+      console.error("Search error:", error);
+      results.textContent = "Search failed: " + error.message;
+    }
+  }, 400);
+});
