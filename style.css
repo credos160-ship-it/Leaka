@@ -1555,3 +1555,58 @@ button:focus-visible,
   color: white;
   font-size: 27px;
 }
+
+/* PREMIUM LEAKA FINISH */
+
+.section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.story-create-button {
+  min-width: 76px;
+  flex-shrink: 0;
+}
+
+.profile-card,
+.profile-edit,
+.settings-card,
+.post-card {
+  box-shadow: 0 8px 30px rgba(0,0,0,.12);
+}
+
+#profilePosts {
+  width: 100%;
+}
+
+#profilePosts > .empty-state {
+  grid-column: 1 / -1;
+  width: 100%;
+}
+
+#notificationsList {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+button:disabled {
+  opacity: .55;
+  cursor: not-allowed;
+}
+
+@media(max-width: 380px) {
+  .profile-heading-actions {
+    gap: 5px;
+  }
+
+  #editProfileToggle,
+  #settingsGear {
+    padding: 9px;
+    font-size: 11px;
+  }
+}
+
