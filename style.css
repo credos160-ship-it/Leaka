@@ -1250,3 +1250,39 @@ button:focus-visible,
   outline: 2px solid var(--purple-light);
   outline-offset: 3px;
 }
+/* PROFILE HEADER */
+
+.profile-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.profile-heading-actions {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+
+#editProfileToggle,
+#settingsGear {
+  padding: 11px 14px;
+  border-radius: 12px;
+  background: var(--surface2);
+  color: var(--purple-light);
+  font-size: 13px;
+  font-weight: 700;
+  border: 1px solid var(--border);
+}
+
+/* PROFILE EDITOR */
+
+.profile-edit {
+  margin-top: 15px;
+  animation: fadeIn .25s ease;
+}
+
+.profile-edit[hidden] {
+  display: none !important;
+}
