@@ -992,7 +992,7 @@ on("createStoryBtn", "click", () => {
 
 console.log("LEAKA initialized successfully 💜");
 /* =========================================
-   LEAKA — SEARCH USERS
+   LEAKA — USER SEARCH SYSTEM
 ========================================= */
 
 let searchTimeout;
@@ -1000,24 +1000,27 @@ let searchTimeout;
 on("search", "input", event => {
   clearTimeout(searchTimeout);
 
-  const query = event.target.value.trim();
+  const query = event.target.value.trim().replace(/^@/, "");
   const results = $("searchResults");
 
   if (!results) return;
 
   results.replaceChildren();
 
-  if (query.length < 2) return;
+  if (query.length < 1) return;
 
+  results.style.display = "block";
   results.textContent = "Searching LEAKA...";
 
   searchTimeout = setTimeout(async () => {
     try {
       const { data, error } = await supabaseClient
         .from("profiles")
-        .select("id, username, display_name")
-        .or(`username.ilike.%${query}%,display_name.ilike.%${query}%`)
-        .limit(10);
+        .select("id, username, display_name, avatar_url")
+        .or(
+          `username.ilike.%${query}%,display_name.ilike.%${query}%`
+        )
+        .limit(30);
 
       if (error) throw error;
 
@@ -1032,19 +1035,52 @@ on("search", "input", event => {
         const item = document.createElement("div");
         item.className = "search-user";
 
+        const avatar = document.createElement("div");
+        avatar.className = "search-user-avatar";
+
+        if (user.avatar_url) {
+          const img = document.createElement("img");
+          img.src = user.avatar_url;
+          img.alt = "";
+          img.style.width = "100%";
+          img.style.height = "100%";
+          img.style.objectFit = "cover";
+          img.style.borderRadius = "50%";
+          avatar.appendChild(img);
+        } else {
+          avatar.textContent = (user.display_name || user.username || "U")
+            .charAt(0).toUpperCase();
+        }
+
+        const info = document.createElement("div");
+
         const name = document.createElement("strong");
         name.textContent = user.display_name || user.username;
 
         const username = document.createElement("span");
         username.textContent = "@" + user.username;
 
-        item.append(name, username);
+        info.append(name, username);
+        item.append(avatar, info);
+
+        item.addEventListener("click", () => {
+          results.replaceChildren();
+
+          $("search").value = "";
+
+          if (user.id === currentUser?.id) {
+            showPage("profile");
+          } else {
+            alert("Other user profiles are coming next! 💜");
+          }
+        });
+
         results.appendChild(item);
       });
 
     } catch (error) {
-      console.error("Search error:", error);
-      results.textContent = "Search failed: " + error.message;
+      console.error("LEAKA search error:", error);
+      results.textContent = "Search error: " + error.message;
     }
-  }, 400);
+  }, 300);
 });
