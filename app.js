@@ -1557,6 +1557,132 @@ async function createNotification(userId, type, message) {
   }
 }
 
+
+// =========================================
+// LEAKA NOTIFICATIONS
+// =========================================
+
+async function loadNotifications() {
+  if (!currentUser) return;
+
+  const container = $("notificationsList");
+
+  const { data, error } = await db
+    .from("notifications")
+    .select("*")
+    .eq("user_id", currentUser.id)
+    .order("created_at", { ascending: false })
+    .limit(50);
+
+  if (error) {
+    console.error("Notifications:", error);
+    if (container) {
+      container.innerHTML =
+        '<p class="muted">Could not load notifications.</p>';
+    }
+    return;
+  }
+
+  const notifications = data || [];
+  const unread = notifications.filter(n => !n.is_read).length;
+
+  const badge = $("notificationBadge");
+
+  if (badge) {
+    badge.hidden = unread === 0;
+    badge.textContent = unread > 9 ? "9+" : unread;
+  }
+
+  if (!container) return;
+
+  if (!notifications.length) {
+    container.innerHTML = `
+      <div class="empty-state">
+        <div>♡</div>
+        <h3>You're all caught up</h3>
+        <p>Your LEAKA activity will appear here.</p>
+      </div>
+    `;
+    return;
+  }
+
+  container.innerHTML = "";
+
+  for (const notification of notifications) {
+    const actor = notification.actor_id
+      ? await getProfile(notification.actor_id).catch(() => null)
+      : null;
+
+    const item = document.createElement("div");
+
+    item.className = `notification-item ${
+      notification.is_read ? "" : "unread"
+    }`;
+
+    item.innerHTML = `
+      <div class="notification-avatar">
+        ${avatarHTML(
+          actor?.avatar_url,
+          profileName(actor)
+        )}
+      </div>
+
+      <div class="notification-content">
+        <p>
+          <strong>${escapeHTML(profileName(actor))}</strong>
+          ${escapeHTML(notification.message || "interacted with you")}
+        </p>
+
+        <small>
+          ${new Date(notification.created_at).toLocaleString()}
+        </small>
+      </div>
+
+      ${notification.is_read ? "" : '<span>💜</span>'}
+    `;
+
+    item.addEventListener("click", async () => {
+      if (notification.is_read) return;
+
+      const { error } = await db
+        .from("notifications")
+        .update({ is_read: true })
+        .eq("id", notification.id)
+        .eq("user_id", currentUser.id);
+
+      if (error) {
+        notify(error.message, true);
+        return;
+      }
+
+      await loadNotifications();
+    });
+
+    container.appendChild(item);
+  }
+}
+
+// MARK ALL READ
+
+$("markAllRead")?.addEventListener("click", async () => {
+  if (!currentUser) return;
+
+  const { error } = await db
+    .from("notifications")
+    .update({ is_read: true })
+    .eq("user_id", currentUser.id)
+    .eq("is_read", false);
+
+  if (error) {
+    notify(error.message, true);
+    return;
+  }
+
+  await loadNotifications();
+
+  notify("All notifications marked as read 💜");
+});
+
 // =========================================
 // FOLLOW REQUESTS
 // =========================================
