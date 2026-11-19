@@ -734,6 +734,7 @@ $("postBtn")?.addEventListener("click", async () => {
 // FEED
 // =====================================================
 
+
 async function loadPosts() {
   const container = $("posts");
 
@@ -748,7 +749,7 @@ async function loadPosts() {
     .limit(50);
 
   if (error) {
-    console.error(error);
+    console.error("Posts error:", error);
     container.innerHTML = `<p class="muted">Could not load posts.</p>`;
     return;
   }
@@ -770,10 +771,12 @@ async function loadPosts() {
 
   const userIds = [...new Set(data.map(post => post.user_id))];
 
-  const { data: profileData } = await db
+  const { data: profileData, error: profileError } = await db
     .from("profiles")
     .select("*")
     .in("id", userIds);
+
+  if (profileError) console.error("Profile error:", profileError);
 
   (profileData || []).forEach(profile => {
     profiles.set(profile.id, profile);
@@ -781,15 +784,18 @@ async function loadPosts() {
 
   const postIds = data.map(post => post.id);
 
-  const { data: likes } = await db
+  const { data: likes, error: likesError } = await db
     .from("likes")
     .select("post_id,user_id")
     .in("post_id", postIds);
+
+  if (likesError) console.error("Likes error:", likesError);
 
   (likes || []).forEach(like => {
     if (!likesMap.has(like.post_id)) {
       likesMap.set(like.post_id, []);
     }
+
     likesMap.get(like.post_id).push(like);
   });
 
@@ -811,7 +817,10 @@ async function loadPosts() {
         </div>
 
         <div>
-          <div class="post-user">${escapeHTML(profileName(profile))}</div>
+          <div class="post-user">
+            ${escapeHTML(profileName(profile))}
+          </div>
+
           <div class="post-time">
             @${escapeHTML(username(profile))} · ${timeAgo(post.created_at)}
           </div>
@@ -824,70 +833,133 @@ async function loadPosts() {
 
       ${post.media_url
         ? post.media_type === "video"
-          ? `<video class="post-media" src="${escapeHTML(post.media_url)}" controls playsinline></video>`
-          : `<img class="post-media" src="${escapeHTML(post.media_url)}" alt="Post" loading="lazy">`
+          ? `<video class="post-media"
+              src="${escapeHTML(post.media_url)}"
+              controls playsinline></video>`
+          : `<img class="post-media"
+              src="${escapeHTML(post.media_url)}"
+              alt="Post"
+              loading="lazy">`
         : ""}
 
       <div class="post-actions">
+
         <button class="action-btn ${liked ? "liked" : ""}"
           data-like="${escapeHTML(post.id)}">
           ${liked ? "♥" : "♡"} ${postLikes.length} Likes
         </button>
 
         <button class="action-btn"
-          data-comment-focus="${escapeHTML(post.id)}">
-          ♧ Comment
+          data-toggle-comments="${escapeHTML(post.id)}">
+          ♧ Comments
         </button>
 
         ${post.user_id === currentUser.id
-          ? `<button class="action-btn" data-delete-post="${escapeHTML(post.id)}">Delete</button>`
+          ? `<button class="action-btn"
+              data-delete-post="${escapeHTML(post.id)}">
+              Delete
+            </button>`
           : ""}
+
       </div>
 
-      <div class="comment-area">
-        <input id="comment-${escapeHTML(post.id)}"
-          placeholder="Write a comment...">
-        <button data-comment="${escapeHTML(post.id)}">Send</button>
-      </div>
+      <div class="comments-wrapper" hidden>
 
-      <div class="comments" id="comments-${escapeHTML(post.id)}">
-        Loading comments...
+        <div class="comment-area">
+          <input
+            id="comment-${escapeHTML(post.id)}"
+            placeholder="Write a comment..."
+          >
+
+          <button data-comment="${escapeHTML(post.id)}">
+            Send
+          </button>
+        </div>
+
+        <div class="comments"
+          id="comments-${escapeHTML(post.id)}">
+        </div>
+
       </div>
     `;
 
     container.appendChild(card);
-    loadComments(post.id);
+
+    // Comments load only when opened
+    const toggleButton = card.querySelector("[data-toggle-comments]");
+    const commentsWrapper = card.querySelector(".comments-wrapper");
+    const commentInput = card.querySelector(
+      `#comment-${CSS.escape(post.id)}`
+    );
+
+    let commentsLoaded = false;
+    let loadingComments = false;
+
+    toggleButton.addEventListener("click", async () => {
+
+      const opening = commentsWrapper.hidden;
+
+      commentsWrapper.hidden = !opening;
+
+      if (!opening) return;
+
+      if (!commentsLoaded && !loadingComments) {
+        loadingComments = true;
+
+        commentsWrapper.querySelector(".comments").innerHTML =
+          `<p class="muted">Loading comments...</p>`;
+
+        try {
+          await loadComments(post.id);
+          commentsLoaded = true;
+        } catch (err) {
+          console.error("Comment loading error:", err);
+
+          commentsWrapper.querySelector(".comments").innerHTML =
+            `<p class="muted">Could not load comments.</p>`;
+        } finally {
+          loadingComments = false;
+        }
+      }
+
+      commentInput?.focus();
+    });
   }
 }
 
-// =====================================================
-// LIKES
-// =====================================================
+// =========================================
+// LEAKA — LIKE SYSTEM
+// Like • Unlike • Instant UI update
+// =========================================
+
+const processingLikes = new Set();
 
 document.addEventListener("click", async event => {
   const button = event.target.closest("[data-like]");
+
   if (!button || !currentUser) return;
 
   const postId = button.dataset.like;
+
+  if (processingLikes.has(postId)) return;
+
+  processingLikes.add(postId);
   button.disabled = true;
 
+  const wasLiked = button.classList.contains("liked");
+
   try {
-    const { data: existing, error: findError } = await db
-      .from("likes")
-      .select("id")
-      .eq("post_id", postId)
-      .eq("user_id", currentUser.id)
-      .maybeSingle();
-
-    if (findError) throw findError;
-
-    if (existing) {
+    if (wasLiked) {
       const { error } = await db
         .from("likes")
         .delete()
-        .eq("id", existing.id);
+        .eq("post_id", postId)
+        .eq("user_id", currentUser.id);
 
       if (error) throw error;
+
+      button.classList.remove("liked");
+      button.textContent = button.textContent.replace("♥", "♡");
 
     } else {
       const { error } = await db
@@ -898,23 +970,42 @@ document.addEventListener("click", async event => {
         });
 
       if (error) throw error;
+
+      button.classList.add("liked");
+      button.textContent = button.textContent.replace("♡", "♥");
     }
 
-    await loadPosts();
+    const match = button.textContent.match(/\d+/);
+    const count = match ? Number(match[0]) : 0;
+
+    button.textContent = button.textContent.replace(
+      /\d+/,
+      String(wasLiked ? Math.max(0, count - 1) : count + 1)
+    );
 
   } catch (error) {
-    notify(error.message, true);
+    console.error("Like error:", error);
+    notify("Like failed: " + error.message, true);
+
+  } finally {
+    processingLikes.delete(postId);
     button.disabled = false;
   }
 });
 
 // =====================================================
-// COMMENTS
+// COMMENTS — LEAKA FIXED SYSTEM
+// Hidden by default • Single submission • Live refresh
 // =====================================================
 
 async function loadComments(postId) {
   const container = $("comments-" + postId);
+
   if (!container) return;
+
+  container.innerHTML = `
+    <p class="muted">Loading comments...</p>
+  `;
 
   const { data, error } = await db
     .from("comments")
@@ -923,30 +1014,62 @@ async function loadComments(postId) {
     .order("created_at", { ascending: true });
 
   if (error) {
+    console.error("Comments:", error);
     container.textContent = "Comments unavailable.";
     return;
   }
 
   container.innerHTML = "";
 
-  for (const comment of data || []) {
-    const profile = await getProfile(comment.user_id)
-      .catch(() => null);
-
-    const p = document.createElement("p");
-
-    p.innerHTML = `
-      <strong>${escapeHTML(profileName(profile))}:</strong>
-      ${escapeHTML(comment.content || comment.comment || "")}
+  if (!data || data.length === 0) {
+    container.innerHTML = `
+      <p class="muted">No comments yet. Be the first! 💜</p>
     `;
-
-    container.appendChild(p);
+    return;
   }
+
+  const userIds = [...new Set(data.map(c => c.user_id))];
+
+  const { data: profiles } = await db
+    .from("profiles")
+    .select("*")
+    .in("id", userIds);
+
+  const profileMap = new Map();
+
+  (profiles || []).forEach(profile => {
+    profileMap.set(profile.id, profile);
+  });
+
+  data.forEach(comment => {
+    const profile = profileMap.get(comment.user_id);
+
+    const item = document.createElement("div");
+    item.className = "leaka-comment";
+
+    const author = document.createElement("strong");
+    author.textContent = profileName(profile);
+
+    const message = document.createElement("span");
+    message.textContent = " " + (
+      comment.content || comment.comment || ""
+    );
+
+    item.appendChild(author);
+    item.appendChild(message);
+
+    container.appendChild(item);
+  });
 }
+
+// SEND COMMENT — ONE INSERT PER CLICK
 
 document.addEventListener("click", async event => {
   const button = event.target.closest("[data-comment]");
+
   if (!button || !currentUser) return;
+
+  if (button.dataset.sending === "true") return;
 
   const postId = button.dataset.comment;
   const input = $("comment-" + postId);
@@ -957,6 +1080,7 @@ document.addEventListener("click", async event => {
     return;
   }
 
+  button.dataset.sending = "true";
   button.disabled = true;
 
   try {
@@ -965,26 +1089,25 @@ document.addEventListener("click", async event => {
       .insert({
         post_id: postId,
         user_id: currentUser.id,
-        content
+        content: content
       });
 
     if (error) throw error;
 
     input.value = "";
+
     await loadComments(postId);
 
+    notify("Comment posted 💜");
+
   } catch (error) {
-    notify(error.message, true);
+    console.error("Comment submission:", error);
+    notify("Comment failed: " + error.message, true);
+
   } finally {
+    button.dataset.sending = "false";
     button.disabled = false;
   }
-});
-
-document.addEventListener("click", event => {
-  const button = event.target.closest("[data-comment-focus]");
-  if (!button) return;
-
-  $("comment-" + button.dataset.commentFocus)?.focus();
 });
 
 // =====================================================
@@ -1780,8 +1903,242 @@ document.querySelectorAll("[data-profile-tab]")
     });
   });
 
+
 // =====================================================
-// STORIES
+// LEAKA — INSTAGRAM / WHATSAPP STYLE STORIES
+// Grouped Stories • 15s Timer • Sequential Playback
+// =====================================================
+
+let storyGroups = [];
+let activeStoryGroup = [];
+let activeStoryIndex = 0;
+let storyTimer = null;
+let storyProgressTimer = null;
+let storyStartedAt = 0;
+let storyRemaining = 15000;
+let storyPaused = false;
+
+// Prevent duplicate listeners
+let storyInputHandler = null;
+
+// =====================================================
+// STORY VIEWER DESIGN
+// =====================================================
+
+(function createStoryStyles() {
+  if (document.getElementById("leakaStoryStyles")) return;
+
+  const style = document.createElement("style");
+  style.id = "leakaStoryStyles";
+
+  style.textContent = `
+    .story-create-button {
+      border: none;
+      background: transparent;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 9px;
+      min-width: 100px;
+      cursor: pointer;
+      color: #c084fc;
+    }
+
+    .story-create-button > span {
+      width: 76px;
+      height: 76px;
+      border-radius: 50%;
+      border: 2px dashed #b45cff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 38px;
+      background: linear-gradient(145deg,#24132f,#120b1c);
+      box-shadow: 0 0 18px #a855f755;
+      transition: .2s;
+    }
+
+    .story-create-button:active > span {
+      transform: scale(.9);
+    }
+
+    .story-item {
+      border: none;
+      background: transparent;
+      min-width: 100px;
+      cursor: pointer;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 8px;
+      color: white;
+    }
+
+    .story-ring {
+      width: 82px;
+      height: 82px;
+      padding: 4px;
+      border-radius: 50%;
+      background: linear-gradient(45deg,#9333ea,#ec4899,#c084fc);
+      box-shadow: 0 0 15px #a855f755;
+    }
+
+    .story-avatar {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      border-radius: 50%;
+      background: #21152e;
+      border: 3px solid #130c1c;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .story-avatar img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+
+    .story-avatar > * {
+      max-width: 100%;
+    }
+
+    .story-item small {
+      color: #d4c4e4;
+      font-size: 12px;
+      max-width: 90px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    #storyViewer {
+      position: fixed;
+      inset: 0;
+      z-index: 999999;
+      background: #08060d;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+    }
+
+    #storyViewer[hidden] {
+      display: none !important;
+    }
+
+    .story-viewer-top {
+      position: absolute;
+      top: max(12px, env(safe-area-inset-top));
+      left: 12px;
+      right: 12px;
+      z-index: 5;
+    }
+
+    .story-progress-list {
+      display: flex;
+      gap: 4px;
+      width: 100%;
+      margin-bottom: 15px;
+    }
+
+    .story-progress-track {
+      height: 3px;
+      flex: 1;
+      background: #ffffff55;
+      border-radius: 10px;
+      overflow: hidden;
+    }
+
+    .story-progress-fill {
+      width: 0%;
+      height: 100%;
+      background: white;
+    }
+
+    .story-viewer-user {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      color: white;
+      font-weight: bold;
+    }
+
+    .story-viewer-user img {
+      width: 38px;
+      height: 38px;
+      border-radius: 50%;
+      object-fit: cover;
+    }
+
+    .story-close {
+      position: absolute;
+      top: 5px;
+      right: 5px;
+      color: white;
+      background: #ffffff22;
+      border: none;
+      border-radius: 50%;
+      width: 38px;
+      height: 38px;
+      font-size: 26px;
+      z-index: 10;
+    }
+
+    .story-viewer-content {
+      width: 100%;
+      height: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .story-viewer-content img,
+    .story-viewer-content video {
+      max-width: 100%;
+      max-height: 100%;
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+    }
+
+    .story-tap-left,
+    .story-tap-right {
+      position: absolute;
+      top: 90px;
+      bottom: 80px;
+      width: 35%;
+      z-index: 3;
+    }
+
+    .story-tap-left {
+      left: 0;
+    }
+
+    .story-tap-right {
+      right: 0;
+    }
+
+    .story-pause-indicator {
+      position: absolute;
+      color: white;
+      font-size: 35px;
+      z-index: 8;
+      background: #0008;
+      padding: 15px;
+      border-radius: 50%;
+      display: none;
+    }
+  `;
+
+  document.head.appendChild(style);
+})();
+
+// =====================================================
+// LOAD AND GROUP STORIES
 // =====================================================
 
 async function loadStories() {
@@ -1793,12 +2150,47 @@ async function loadStories() {
     .from("stories")
     .select("*")
     .gt("expires_at", new Date().toISOString())
-    .order("created_at", { ascending: false });
+    .order("created_at", { ascending: true });
 
   if (error) {
     console.error("Stories:", error);
     return;
   }
+
+  const grouped = new Map();
+
+  for (const story of data || []) {
+    if (!grouped.has(story.user_id)) {
+      grouped.set(story.user_id, []);
+    }
+
+    grouped.get(story.user_id).push(story);
+  }
+
+  storyGroups = [];
+
+  for (const [userId, stories] of grouped) {
+    const profile = await getProfile(userId).catch(() => null);
+
+    storyGroups.push({
+      userId,
+      profile,
+      stories
+    });
+  }
+
+  // Most recently updated users first
+  storyGroups.sort((a, b) => {
+    const aTime = new Date(
+      a.stories[a.stories.length - 1].created_at
+    ).getTime();
+
+    const bTime = new Date(
+      b.stories[b.stories.length - 1].created_at
+    ).getTime();
+
+    return bTime - aTime;
+  });
 
   container.innerHTML = `
     <button id="createStoryBtn" class="story-create-button">
@@ -1807,21 +2199,12 @@ async function loadStories() {
     </button>
   `;
 
-  $("createStoryBtn")?.addEventListener("click", () => {
+  $("createStoryBtn").onclick = () => {
     $("storyInput")?.click();
-  });
+  };
 
-  const profiles = new Map();
-
-  for (const story of data || []) {
-    if (!profiles.has(story.user_id)) {
-      profiles.set(
-        story.user_id,
-        await getProfile(story.user_id).catch(() => null)
-      );
-    }
-
-    const profile = profiles.get(story.user_id);
+  for (const group of storyGroups) {
+    const profile = group.profile;
 
     const item = document.createElement("button");
     item.className = "story-item";
@@ -1829,95 +2212,446 @@ async function loadStories() {
     item.innerHTML = `
       <div class="story-ring">
         <div class="story-avatar">
-          ${avatarHTML(profile?.avatar_url, profileName(profile))}
+          ${avatarHTML(
+            profile?.avatar_url,
+            profileName(profile)
+          )}
         </div>
       </div>
-      <small>${escapeHTML(profileName(profile))}</small>
+
+      <small>${escapeHTML(
+        group.userId === currentUser.id
+          ? "Your Story"
+          : profileName(profile)
+      )}</small>
     `;
 
-    item.addEventListener("click", () => openStory(story));
+    item.onclick = () => {
+      openStoryGroup(group.userId);
+    };
 
     container.appendChild(item);
   }
 }
 
+// =====================================================
 // CREATE STORY
+// =====================================================
 
-$("storyInput")?.addEventListener("change", async event => {
-  const file = event.target.files?.[0];
+const storyInput = $("storyInput");
 
-  if (!file || !currentUser) return;
+if (storyInput) {
+  storyInput.onchange = async function(event) {
+    const file = event.target.files?.[0];
 
-  if (
-    !file.type.startsWith("image/") &&
-    !file.type.startsWith("video/")
-  ) {
-    notify("Choose an image or video.", true);
-    event.target.value = "";
-    return;
-  }
+    if (!file || !currentUser) return;
 
-  if (file.size > 25 * 1024 * 1024) {
-    notify("Maximum file size is 25MB.", true);
-    event.target.value = "";
-    return;
-  }
+    if (
+      !file.type.startsWith("image/") &&
+      !file.type.startsWith("video/")
+    ) {
+      notify("Choose an image or video.", true);
+      event.target.value = "";
+      return;
+    }
 
-  notify("Uploading your story...");
+    if (file.size > 25 * 1024 * 1024) {
+      notify("Maximum file size is 25MB.", true);
+      event.target.value = "";
+      return;
+    }
 
-  try {
-    const url = await uploadMedia(file, "stories");
-    if (!url) return;
+    try {
+      notify("Uploading your story...");
 
-    const mediaType = file.type.startsWith("video/")
-      ? "video"
-      : "image";
+      const url = await uploadMedia(file, "stories");
 
-    const { error } = await db
-      .from("stories")
-      .insert({
-        user_id: currentUser.id,
-        media_url: url,
-        media_type: mediaType
-      });
+      if (!url) throw new Error("Media upload failed.");
 
-    if (error) throw error;
+      const mediaType = file.type.startsWith("video/")
+        ? "video"
+        : "image";
 
-    notify("Your story is live! 💜");
-    await loadStories();
+      const { error } = await db
+        .from("stories")
+        .insert({
+          user_id: currentUser.id,
+          media_url: url,
+          media_type: mediaType
+        });
 
-  } catch (error) {
-    notify("Story publishing failed: " + error.message, true);
-  } finally {
-    event.target.value = "";
-  }
-});
+      if (error) throw error;
 
-// OPEN STORY
+      notify("Story published! 💜");
 
-function openStory(story) {
-  let viewer = $("storyViewer");
+      await loadStories();
 
-  if (!viewer) {
-    viewer = document.createElement("div");
-    viewer.id = "storyViewer";
-    document.body.appendChild(viewer);
-  }
-
-  const media = story.media_type === "video"
-    ? `<video src="${escapeHTML(story.media_url)}" autoplay controls playsinline></video>`
-    : `<img src="${escapeHTML(story.media_url)}" alt="Story">`;
-
-  viewer.innerHTML = `
-    <button class="story-close"
-      onclick="document.getElementById('storyViewer').hidden=true">×</button>
-    <div class="story-viewer-content">${media}</div>
-  `;
-
-  viewer.hidden = false;
+    } catch (error) {
+      console.error(error);
+      notify("Story failed: " + error.message, true);
+    } finally {
+      event.target.value = "";
+    }
+  };
 }
 
-window.openStory = openStory;
+
+ // =====================================================
+ // STORY VIEWER — LEAKA UPGRADE
+ // =====================================================
+
+
+// =====================================================
+// LEAKA — WHATSAPP STYLE STORY VIEWER
+// STAGE 1: VIEWER STRUCTURE
+// =====================================================
+
+function getStoryViewer() {
+  let viewer = $("storyViewer");
+
+  if (viewer) return viewer;
+
+  viewer = document.createElement("div");
+  viewer.id = "storyViewer";
+  viewer.hidden = true;
+
+  viewer.innerHTML = `
+    <div class="story-progress-list"
+         id="storyProgressList"></div>
+
+    <div class="story-viewer-top">
+      <div class="story-viewer-user"
+           id="storyViewerUser"></div>
+
+      <button class="story-close"
+              id="storyClose">×</button>
+    </div>
+
+    <div class="story-viewer-content"
+         id="storyViewerContent"></div>
+
+    <div class="story-tap-left"
+         id="storyTapLeft"></div>
+
+    <div class="story-tap-right"
+         id="storyTapRight"></div>
+
+    <div class="story-pause-indicator"
+         id="storyPauseIndicator">Ⅱ</div>
+
+    <!-- VIEWER REPLY CONTROLS -->
+    <div class="story-reply-controls"
+         id="storyReplyControls">
+
+      <div class="story-quick-reactions">
+        <button data-story-reaction="❤️">❤️</button>
+        <button data-story-reaction="😂">😂</button>
+        <button data-story-reaction="😮">😮</button>
+        <button data-story-reaction="🔥">🔥</button>
+      </div>
+
+      <div class="story-reply-bar">
+        <input
+          id="storyReplyInput"
+          type="text"
+          placeholder="Reply to story..."
+          autocomplete="off">
+
+        <button id="storyReplySend">➤</button>
+      </div>
+    </div>
+
+    <!-- STORY OWNER VIEWERS BUTTON -->
+    <button id="storyViewersButton"
+            class="story-viewers-button"
+            hidden>
+      <span>◉</span>
+      <span id="storyViewersCount">0</span>
+    </button>
+
+    <!-- VIEWERS PANEL -->
+    <div id="storyViewersPanel"
+         class="story-viewers-panel"
+         hidden>
+
+      <div class="story-viewers-handle"></div>
+
+      <div class="story-viewers-heading">
+        <strong>Viewed by</strong>
+        <button id="storyViewersClose">×</button>
+      </div>
+
+      <div id="storyViewersList"
+           class="story-viewers-list">
+      </div>
+    </div>
+  `;
+
+  document.body.appendChild(viewer);
+
+  $("storyClose").onclick = closeStoryViewer;
+
+  $("storyTapLeft").onclick = previousStory;
+  $("storyTapRight").onclick = nextStory;
+
+  $("storyViewersClose").onclick = closeStoryViewers;
+
+  $("storyViewersButton").onclick = openStoryViewers;
+
+  return viewer;
+}
+
+// =====================================================
+// OPEN A PERSON'S STORY GROUP
+// =====================================================
+
+function openStoryGroup(userId) {
+  const group = storyGroups.find(g => g.userId === userId);
+
+  if (!group || !group.stories.length) return;
+
+  activeStoryGroup = group.stories;
+  activeStoryIndex = 0;
+
+  const viewer = getStoryViewer();
+
+  viewer.hidden = false;
+
+  $("storyViewerUser").innerHTML = `
+    ${avatarHTML(
+      group.profile?.avatar_url,
+      profileName(group.profile)
+    )}
+    <span>${escapeHTML(profileName(group.profile))}</span>
+  `;
+
+  const progress = $("storyProgressList");
+
+  progress.innerHTML = activeStoryGroup.map(() => `
+    <div class="story-progress-track">
+      <div class="story-progress-fill"></div>
+    </div>
+  `).join("");
+
+  showActiveStory();
+}
+
+// =====================================================
+// DISPLAY CURRENT STORY
+// =====================================================
+
+async function showActiveStory() {
+  clearTimeout(storyTimer);
+  clearInterval(storyProgressTimer);
+
+  if (activeStoryIndex >= activeStoryGroup.length) {
+    closeStoryViewer();
+    return;
+  }
+
+  const story = activeStoryGroup[activeStoryIndex];
+  const content = $("storyViewerContent");
+
+  content.innerHTML = "";
+
+  const media = document.createElement(
+    story.media_type === "video" ? "video" : "img"
+  );
+
+  media.src = story.media_url;
+
+  if (story.media_type === "video") {
+    media.autoplay = true;
+    media.muted = false;
+    media.playsInline = true;
+    media.controls = false;
+  }
+
+  content.appendChild(media);
+
+  // Reset story viewing interface
+  storyRemaining = 15000;
+  storyPaused = false;
+
+  // Hide viewers panel when changing stories
+  const panel = $("storyViewersPanel");
+  if (panel) panel.hidden = true;
+
+  // Show reply controls only to other people's stories
+  const isOwner = story.user_id === currentUser.id;
+
+  const replies = $("storyReplyControls");
+  if (replies) replies.hidden = isOwner;
+
+  // Show viewers button only to story owner
+  const viewersButton = $("storyViewersButton");
+
+  if (viewersButton) {
+    viewersButton.hidden = !isOwner;
+  }
+
+  // Load viewer information for owner's story
+  if (isOwner) {
+    await loadStoryViewers(story.id);
+  }
+
+  updateStoryProgress();
+  startStoryTimer();
+
+  if (story.media_type === "video") {
+    media.play().catch(() => {
+      media.muted = true;
+      media.play().catch(() => {});
+    });
+  }
+}
+
+// =====================================================
+// 15 SECOND TIMER AND PROGRESS
+// =====================================================
+
+function startStoryTimer() {
+  storyStartedAt = Date.now();
+
+  const fills = document.querySelectorAll(
+    ".story-progress-fill"
+  );
+
+  const currentFill = fills[activeStoryIndex];
+
+  storyTimer = setTimeout(() => {
+    nextStory();
+  }, storyRemaining);
+
+  storyProgressTimer = setInterval(() => {
+    const elapsed = Date.now() - storyStartedAt;
+
+    const percent = Math.min(
+      100,
+      ((15000 - storyRemaining + elapsed) / 15000) * 100
+    );
+
+    if (currentFill) {
+      currentFill.style.width = percent + "%";
+    }
+  }, 50);
+}
+
+function updateStoryProgress() {
+  const fills = document.querySelectorAll(
+    ".story-progress-fill"
+  );
+
+  fills.forEach((fill, index) => {
+    fill.style.width = index < activeStoryIndex
+      ? "100%"
+      : "0%";
+  });
+}
+
+// =====================================================
+// NEXT STORY
+// =====================================================
+
+function nextStory() {
+  clearTimeout(storyTimer);
+  clearInterval(storyProgressTimer);
+
+  activeStoryIndex++;
+
+  if (activeStoryIndex >= activeStoryGroup.length) {
+    closeStoryViewer();
+    return;
+  }
+
+  showActiveStory();
+}
+
+// =====================================================
+// PREVIOUS STORY
+// =====================================================
+
+function previousStory() {
+  clearTimeout(storyTimer);
+  clearInterval(storyProgressTimer);
+
+  if (activeStoryIndex > 0) {
+    activeStoryIndex--;
+  }
+
+  showActiveStory();
+}
+
+// =====================================================
+// PAUSE / RESUME
+// =====================================================
+
+function pauseStory() {
+  if (storyPaused) return;
+
+  storyPaused = true;
+
+  const elapsed = Date.now() - storyStartedAt;
+
+  storyRemaining = Math.max(
+    0,
+    storyRemaining - elapsed
+  );
+
+  clearTimeout(storyTimer);
+  clearInterval(storyProgressTimer);
+
+  const video = $("storyViewerContent")?.querySelector("video");
+
+  if (video) video.pause();
+
+  $("storyPauseIndicator").style.display = "block";
+}
+
+function resumeStory() {
+  if (!storyPaused) return;
+
+  storyPaused = false;
+
+  $("storyPauseIndicator").style.display = "none";
+
+  const video = $("storyViewerContent")?.querySelector("video");
+
+  if (video) video.play().catch(() => {});
+
+  startStoryTimer();
+}
+
+// =====================================================
+// CLOSE VIEWER
+// =====================================================
+
+function closeStoryViewer() {
+  clearTimeout(storyTimer);
+  clearInterval(storyProgressTimer);
+
+  const viewer = $("storyViewer");
+
+  if (viewer) {
+    const video = viewer.querySelector("video");
+
+    if (video) video.pause();
+
+    viewer.hidden = true;
+  }
+
+  activeStoryGroup = [];
+  activeStoryIndex = 0;
+  storyPaused = false;
+}
+
+// =====================================================
+// GLOBAL FUNCTIONS
+// =====================================================
+
+window.openStory = openStoryGroup;
+window.openStoryGroup = openStoryGroup;
+window.closeStoryViewer = closeStoryViewer;
 
 // =====================================================
 // PRIVACY
