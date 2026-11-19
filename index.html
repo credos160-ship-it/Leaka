@@ -10,44 +10,25 @@
 </head>
 <body>
 
-<!-- ================= AUTH ================= -->
-
 <section id="auth" class="page">
   <div class="auth-card">
     <div class="logo">LEAKA 💜</div>
     <h2>Welcome to Leaka</h2>
     <p>Your world. Your people. Your moments.</p>
-
-    <input type="email" id="email" placeholder="Your email" autocomplete="email">
-    <input type="password" id="password" placeholder="Your password" autocomplete="current-password">
-
+    <input type="email" id="email" placeholder="Your email">
+    <input type="password" id="password" placeholder="Your password">
     <button id="loginBtn">Log In</button>
     <button id="signupBtn">Create Account</button>
-
     <p id="authMessage"></p>
   </div>
 </section>
 
-<!-- ================= MAIN APP ================= -->
-
 <div id="appContent" hidden>
 
-  <!-- TOP NAVIGATION -->
-
   <header class="navbar">
-    <div class="logo">LEAKA</div>
-
-    <div class="nav-items">
-      <button class="nav-item active" data-page="feed">🏠 Home</button>
-      <button class="nav-item" data-page="searchPage">🔍 Search</button>
-      <button class="nav-item" data-page="profile">👤 Profile</button>
-      <button class="nav-item" data-page="settings">⚙️</button>
-    </div>
-
-    <button id="profileBtn" title="My profile">U</button>
+    <div class="logo">LEAKA 💜</div>
+    <span class="navbar-tagline">Your social universe</span>
   </header>
-
-  <!-- ================= HOME / FEED ================= -->
 
   <main id="feed" class="page active">
 
@@ -58,35 +39,33 @@
       </div>
     </div>
 
-    <!-- STORIES -->
-
-    <section class="create-card">
+    <section class="create-card story-card">
       <h3>Stories ✨</h3>
       <p class="muted">Share a moment with your people.</p>
+
       <input type="file" id="storyInput" accept="image/*,video/*" hidden>
-      <button id="createStoryBtn">＋ Create Story</button>
+
+      <button id="createStoryBtn" class="story-add-btn">
+        <span>＋</span> Add Story
+      </button>
     </section>
 
-    <!-- CREATE POST -->
-
-    <section class="create-card">
+    <section class="create-card" id="createPostCard">
       <h3>Create a post</h3>
       <p class="muted">What's happening?</p>
 
       <textarea id="caption" placeholder="Share something with LEAKA..."></textarea>
 
-      <input
-        type="file"
-        id="mediaInput"
-        accept="image/*,video/*"
-      >
+      <label for="mediaInput" class="upload-media-btn">
+        <span>＋</span> Choose Photo or Video
+      </label>
+
+      <input type="file" id="mediaInput" accept="image/*,video/*" hidden>
 
       <div id="preview"></div>
 
       <button id="postBtn">Publish ↗</button>
     </section>
-
-    <!-- POSTS -->
 
     <section class="feed-section">
       <h2>Latest Posts</h2>
@@ -95,25 +74,18 @@
 
   </main>
 
-  <!-- ================= SEARCH ================= -->
-
   <main id="searchPage" class="page" hidden>
     <div class="section-header">
       <h1>Discover 🔍</h1>
     </div>
 
     <div class="search-box">
-      <input
-        type="search"
-        id="search"
-        placeholder="Search people by name or username..."
-      >
+      <input type="search" id="search"
+        placeholder="Search people by name or username...">
     </div>
 
     <div id="searchResults"></div>
   </main>
-
-  <!-- ================= MY PROFILE ================= -->
 
   <main id="profile" class="page" hidden>
 
@@ -141,12 +113,10 @@
             <strong id="postCount">0</strong>
             <span>Posts</span>
           </div>
-
           <div>
             <strong id="followerCount">0</strong>
             <span>Followers</span>
           </div>
-
           <div>
             <strong id="followingCount">0</strong>
             <span>Following</span>
@@ -156,13 +126,10 @@
       </div>
     </section>
 
-    <!-- EDIT PROFILE -->
-
     <section class="profile-edit">
       <h3>Edit Profile ✏️</h3>
 
       <label>Profile picture</label>
-      <div id="editAvatar">U</div>
       <input type="file" id="avatarInput" accept="image/*">
 
       <label>Cover photo</label>
@@ -176,11 +143,8 @@
       <textarea id="bioInput" placeholder="Tell people about yourself..."></textarea>
 
       <button id="saveProfileBtn">Save Profile 💜</button>
-
       <p id="profileMessage"></p>
     </section>
-
-    <!-- PROFILE TABS -->
 
     <div class="public-profile-tabs">
       <button class="selected" data-profile-tab="posts">Posts</button>
@@ -192,8 +156,6 @@
 
   </main>
 
-  <!-- ================= SETTINGS ================= -->
-
   <main id="settings" class="page" hidden>
 
     <div class="section-header">
@@ -202,32 +164,23 @@
 
     <section class="settings-card">
       <h3>Account Information</h3>
-
       <p>Email address</p>
       <strong id="accountEmail">Loading...</strong>
-
       <p>Display name</p>
       <strong id="accountDisplayName">Loading...</strong>
     </section>
 
     <section class="settings-card">
       <h3>Privacy 🔒</h3>
-
       <label>
         <input type="checkbox" id="privateAccount">
         Make my account private
       </label>
-
-      <p>
-        When your account is private, people must send you
-        a follow request before seeing your posts.
-      </p>
+      <p>People must send you a follow request before seeing your private posts.</p>
     </section>
 
     <section class="settings-card">
       <h3>Follow Requests</h3>
-      <p>Manage people who want to follow you.</p>
-
       <div id="followRequestsList">
         <p>No pending follow requests.</p>
       </div>
@@ -240,9 +193,39 @@
 
   </main>
 
-</div>
+  <!-- BOTTOM NAVIGATION -->
 
-<!-- ================= SCRIPTS ================= -->
+  <nav class="bottom-nav">
+
+    <button class="nav-item active" data-page="feed">
+      <span>⌂</span>
+      <small>Home</small>
+    </button>
+
+    <button class="nav-item" data-page="searchPage">
+      <span>⌕</span>
+      <small>Discover</small>
+    </button>
+
+    <button class="nav-item create-nav-btn" data-page="feed" data-scroll="createPostCard">
+      <span>＋</span>
+    </button>
+
+    <button class="nav-item" data-page="profile">
+      <span>♙</span>
+      <small>Profile</small>
+    </button>
+
+    <button class="nav-item" data-page="settings">
+      <span>⚙</span>
+      <small>Settings</small>
+    </button>
+
+  </nav>
+
+  <button id="profileBtn" hidden>U</button>
+
+</div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="app.js"></script>
