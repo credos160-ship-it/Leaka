@@ -1195,9 +1195,11 @@ async function openPublicProfile(userId) {
       </div>
 
       <div class="public-profile-body">
-        <p style="padding:30px;text-align:center">
-          Loading profile...
-        </p>
+        <div class="public-profile-loading">
+  <div class="leaka-spinner"></div>
+  <strong>Loading LEAKA profile...</strong>
+  <small>Connecting your world 💜</small>
+</div>
       </div>
     </div>
   `;
