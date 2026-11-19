@@ -1835,3 +1835,16 @@ checkSession().catch(error => {
   console.error("LEAKA startup error:", error);
   notify("Something went wrong starting LEAKA.", true);
 });
+/* EMPTY PROFILE STATE FULL WIDTH */
+
+#profilePosts > .empty-state {
+  grid-column: 1 / -1;
+  width: 100%;
+  min-height: 260px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 20px;
+  text-align: center;
+}
