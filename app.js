@@ -1,37 +1,53 @@
 
-/* =========================================
-   LEAKA — COMPLETE SOCIAL APP
-   Supabase • Profiles • Posts • Likes
-   Comments • Following • Privacy • Stories
-========================================= */
+/* =====================================================
+   LEAKA — COMPLETE UPDATED APP.JS
+   Authentication • Profiles • Posts • Likes • Comments
+   Search • Following • Private Accounts • Notifications
+   Follow Requests • Stories • Supabase Storage
+===================================================== */
+
+(() => {
+"use strict";
+
+// =====================================================
+// CONFIGURATION
+// =====================================================
 
 const SUPABASE_URL = "https://kiwpmnvoqzrfwblnudjq.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable__oAt1RpObXR5PDqSG7yE1w_SkdZ0Hry";
 const BUCKET = "leaka-media";
 
 const { createClient } = window.supabase;
-const db = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+const db = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+  auth: {
+    persistSession: true,
+    autoRefreshToken: true,
+    detectSessionInUrl: true
+  }
+});
 
 let currentUser = null;
 let currentProfile = null;
 let selectedMedia = null;
 let searchTimer = null;
 let activePublicUser = null;
+let starting = false;
+let authReady = false;
 
 const $ = id => document.getElementById(id);
 
-// =========================================
+// =====================================================
 // HELPERS
-// =========================================
+// =====================================================
 
 function escapeHTML(value = "") {
-  return String(value).replace(/[&<>"']/g, char => ({
+  return String(value).replace(/[&<>"']/g, c => ({
     "&": "&amp;",
     "<": "&lt;",
     ">": "&gt;",
     '"': "&quot;",
     "'": "&#039;"
-  })[char]);
+  })[c]);
 }
 
 function profileName(profile) {
@@ -46,7 +62,7 @@ function username(profile) {
 
 function avatarHTML(url, name = "U") {
   return url
-    ? `<img src="${escapeHTML(url)}" alt="Profile picture">`
+    ? `<img src="${escapeHTML(url)}" alt="Profile picture" loading="lazy">`
     : escapeHTML((name || "U").charAt(0).toUpperCase());
 }
 
@@ -84,9 +100,61 @@ function notify(message, error = false) {
   }, 3000);
 }
 
-// =========================================
-// PROFILE RETRIEVAL
-// =========================================
+function localProfile(userId = currentUser?.id) {
+  if (!userId) return {};
+
+  try {
+    return JSON.parse(
+      localStorage.getItem("leaka_profile_" + userId) || "{}"
+    );
+  } catch {
+    return {};
+  }
+}
+
+function saveLocalProfile(data, userId = currentUser?.id) {
+  if (!userId) return;
+
+  localStorage.setItem(
+    "leaka_profile_" + userId,
+    JSON.stringify(data)
+  );
+}
+
+function setMessage(id, message) {
+  if ($(id)) $(id).textContent = message;
+}
+
+function setLoading(button, loading, text) {
+  if (!button) return;
+
+  button.disabled = loading;
+
+  if (loading) {
+    button.dataset.originalText = button.textContent;
+    button.textContent = text || "Please wait...";
+  } else {
+    button.textContent =
+      button.dataset.originalText || button.textContent;
+  }
+}
+
+function timeAgo(date) {
+  const seconds = Math.floor(
+    (Date.now() - new Date(date).getTime()) / 1000
+  );
+
+  if (seconds < 60) return "Just now";
+  if (seconds < 3600) return Math.floor(seconds / 60) + "m ago";
+  if (seconds < 86400) return Math.floor(seconds / 3600) + "h ago";
+  if (seconds < 604800) return Math.floor(seconds / 86400) + "d ago";
+
+  return new Date(date).toLocaleDateString();
+}
+
+// =====================================================
+// PROFILES
+// =====================================================
 
 async function getProfile(userId) {
   const { data, error } = await db
@@ -103,58 +171,69 @@ async function getProfile(userId) {
 async function ensureProfile(user) {
   let profile = await getProfile(user.id);
 
-  if (!profile) {
-    const baseName = user.email.split("@")[0];
+  if (profile) return profile;
 
-    const newProfile = {
-      id: user.id,
-      username: baseName.toLowerCase()
-        .replace(/[^a-z0-9_]/g, ""),
-      display_name: baseName,
-      bio: "Welcome to my LEAKA space 💜"
-    };
+  const baseName = (
+    user.email?.split("@")[0] || "user"
+  ).toLowerCase().replace(/[^a-z0-9_]/g, "");
 
-    const { error } = await db
-      .from("profiles")
-      .upsert(newProfile);
+  const newProfile = {
+    id: user.id,
+    username: baseName || "user_" + user.id.slice(0, 6),
+    display_name: user.email?.split("@")[0] || "LEAKA User",
+    bio: "Welcome to my LEAKA space 💜"
+  };
 
-    if (error) throw error;
+  const { error } = await db
+    .from("profiles")
+    .insert(newProfile);
 
+  if (error) {
+    // Another session or trigger may have created it.
+    profile = await getProfile(user.id).catch(() => null);
+    if (!profile) throw error;
+  } else {
     profile = await getProfile(user.id);
   }
 
   return profile;
 }
 
-// =========================================
+// =====================================================
 // AUTHENTICATION
-// =========================================
+// =====================================================
 
 async function startApp(user) {
-  if (!user) return;
+  if (!user || starting) return;
 
+  starting = true;
   currentUser = user;
 
   try {
     currentProfile = await ensureProfile(user);
+
+    if ($("auth")) $("auth").hidden = true;
+    if ($("appContent")) $("appContent").hidden = false;
+
+    await updateMyProfileUI();
+
+    await Promise.allSettled([
+      loadPosts(),
+      loadSearch(),
+      loadNotifications(),
+      loadStories(),
+      loadAccountDetails(),
+      loadPrivacySetting(),
+      renderFollowRequests($("followRequestsList"))
+    ]);
+
+    authReady = true;
+
   } catch (error) {
-    console.error(error);
-    notify("Profile loading error: " + error.message, true);
-  }
-
-  if ($("auth")) $("auth").hidden = true;
-  if ($("appContent")) $("appContent").hidden = false;
-
-  await updateMyProfileUI();
-  await loadPosts();
-  await loadSearch();
-  await loadAccountDetails();
-  await loadPrivacySetting();
-
-  const requests = $("followRequestsList");
-
-  if (requests) {
-    await renderFollowRequests(requests);
+    console.error("LEAKA startup:", error);
+    notify("App loading error: " + error.message, true);
+  } finally {
+    starting = false;
   }
 }
 
@@ -162,13 +241,16 @@ async function checkSession() {
   const { data, error } = await db.auth.getSession();
 
   if (error) {
-    console.error(error);
     notify(error.message, true);
+    return;
   }
 
   if (data.session?.user) {
     await startApp(data.session.user);
   } else {
+    currentUser = null;
+    currentProfile = null;
+
     if ($("auth")) $("auth").hidden = false;
     if ($("appContent")) $("appContent").hidden = true;
   }
@@ -181,38 +263,42 @@ $("signupBtn")?.addEventListener("click", async () => {
   const password = $("password")?.value;
 
   if (!email || !password) {
-    $("authMessage").textContent =
-      "Enter your email and password.";
+    setMessage("authMessage", "Enter your email and password.");
     return;
   }
 
   if (password.length < 6) {
-    $("authMessage").textContent =
-      "Password must be at least 6 characters.";
+    setMessage("authMessage", "Password must be at least 6 characters.");
     return;
   }
 
-  $("signupBtn").disabled = true;
-  $("authMessage").textContent = "Creating your account...";
+  const button = $("signupBtn");
+  setLoading(button, true, "Creating account...");
 
   try {
-    const { error } = await db.auth.signUp({
+    const { data, error } = await db.auth.signUp({
       email,
       password,
       options: {
-        emailRedirectTo:
-          "https://credos160-ship-it.github.io/Leaka/"
+        emailRedirectTo: "https://credos160-ship-it.github.io/Leaka/"
       }
     });
 
     if (error) throw error;
 
-    $("authMessage").textContent =
-      "Account created! Check your email for confirmation.";
+    if (data.session?.user) {
+      await startApp(data.session.user);
+    } else {
+      setMessage(
+        "authMessage",
+        "Account created! Check your email to confirm your account."
+      );
+    }
+
   } catch (error) {
-    $("authMessage").textContent = error.message;
+    setMessage("authMessage", error.message);
   } finally {
-    $("signupBtn").disabled = false;
+    setLoading(button, false);
   }
 });
 
@@ -223,13 +309,12 @@ $("loginBtn")?.addEventListener("click", async () => {
   const password = $("password")?.value;
 
   if (!email || !password) {
-    $("authMessage").textContent =
-      "Enter your email and password.";
+    setMessage("authMessage", "Enter your email and password.");
     return;
   }
 
-  $("loginBtn").disabled = true;
-  $("authMessage").textContent = "Logging in...";
+  const button = $("loginBtn");
+  setLoading(button, true, "Logging in...");
 
   try {
     const { data, error } = await db.auth.signInWithPassword({
@@ -241,10 +326,12 @@ $("loginBtn")?.addEventListener("click", async () => {
 
     await startApp(data.user);
 
+    setMessage("authMessage", "");
+
   } catch (error) {
-    $("authMessage").textContent = error.message;
+    setMessage("authMessage", error.message);
   } finally {
-    $("loginBtn").disabled = false;
+    setLoading(button, false);
   }
 });
 
@@ -260,37 +347,46 @@ async function logout() {
 
   currentUser = null;
   currentProfile = null;
+  authReady = false;
 
-  location.reload();
+  if ($("auth")) $("auth").hidden = false;
+  if ($("appContent")) $("appContent").hidden = true;
 }
+
+window.logout = logout;
 
 $("logoutBtn")?.addEventListener("click", logout);
 $("settingsLogoutBtn")?.addEventListener("click", logout);
 
-db.auth.onAuthStateChange((event) => {
+// Listen for authentication changes.
+// INITIAL_SESSION is handled by checkSession().
+
+db.auth.onAuthStateChange((event, session) => {
   if (event === "SIGNED_OUT") {
     currentUser = null;
+    currentProfile = null;
 
     if ($("auth")) $("auth").hidden = false;
     if ($("appContent")) $("appContent").hidden = true;
   }
+
+  if (event === "TOKEN_REFRESHED") {
+    currentUser = session?.user || currentUser;
+  }
 });
 
-// =========================================
+// =====================================================
 // NAVIGATION
-// =========================================
+// =====================================================
 
 function showPage(pageId) {
-  const pages = document.querySelectorAll(
-    "#appContent main.page"
-  );
+  document.querySelectorAll("#appContent main.page")
+    .forEach(page => {
+      const active = page.id === pageId;
 
-  pages.forEach(page => {
-    const active = page.id === pageId;
-
-    page.hidden = !active;
-    page.classList.toggle("active", active);
-  });
+      page.hidden = !active;
+      page.classList.toggle("active", active);
+    });
 
   document.querySelectorAll("[data-page]").forEach(button => {
     button.classList.toggle(
@@ -299,64 +395,53 @@ function showPage(pageId) {
     );
   });
 
-  window.scrollTo({
-    top: 0,
-    behavior: "smooth"
-  });
+  window.scrollTo({ top: 0, behavior: "smooth" });
 
-  if (pageId === "profile") {
-    updateMyProfileUI();
-  }
+  if (pageId === "profile") updateMyProfileUI();
 
   if (pageId === "settings") {
     loadAccountDetails();
     loadPrivacySetting();
-
-    if ($("followRequestsList")) {
-      renderFollowRequests($("followRequestsList"));
-    }
+    renderFollowRequests($("followRequestsList"));
   }
+
+  if (pageId === "notifications") loadNotifications();
 }
+
+window.showPage = showPage;
 
 document.addEventListener("click", event => {
   const button = event.target.closest("[data-page]");
-
-  if (!button) return;
-
-  showPage(button.dataset.page);
+  if (button) showPage(button.dataset.page);
 });
 
-$("profileBtn")?.addEventListener("click", () => {
-  showPage("profile");
-});
+$("profileBtn")?.addEventListener("click", () => showPage("profile"));
+$("settingsGear")?.addEventListener("click", () => showPage("settings"));
 
-$("settingsGear")?.addEventListener("click", () => {
-  showPage("settings");
-});
-
-// =========================================
-// MEDIA UPLOAD
-// =========================================
+// =====================================================
+// STORAGE / MEDIA UPLOAD
+// =====================================================
 
 async function uploadMedia(file, folder = "posts") {
   if (!currentUser || !file) return null;
 
   if (file.size > 25 * 1024 * 1024) {
-    notify("File is too large. Maximum size is 25MB.", true);
+    notify("Maximum file size is 25MB.", true);
     return null;
   }
 
-  const extension =
-    file.name.split(".").pop().toLowerCase();
+  const extension = (
+    file.name.split(".").pop() || "bin"
+  ).toLowerCase().replace(/[^a-z0-9]/g, "");
 
   const path =
-    `${folder}/${currentUser.id}/${Date.now()}.${extension}`;
+    `${folder}/${currentUser.id}/${crypto.randomUUID()}.${extension}`;
 
   const { error } = await db.storage
     .from(BUCKET)
     .upload(path, file, {
       upsert: false,
-      contentType: file.type
+      contentType: file.type || "application/octet-stream"
     });
 
   if (error) {
@@ -372,23 +457,9 @@ async function uploadMedia(file, folder = "posts") {
   return data.publicUrl;
 }
 
-// =========================================
-// PROFILE
-// =========================================
-
-function localProfile() {
-  if (!currentUser) return {};
-
-  try {
-    return JSON.parse(
-      localStorage.getItem(
-        "leaka_profile_" + currentUser.id
-      ) || "{}"
-    );
-  } catch {
-    return {};
-  }
-}
+// =====================================================
+// PROFILE UI
+// =====================================================
 
 async function updateMyProfileUI() {
   if (!currentUser) return;
@@ -399,66 +470,47 @@ async function updateMyProfileUI() {
   const name =
     profile.display_name ||
     local.name ||
-    currentUser.email.split("@")[0];
+    currentUser.email?.split("@")[0] ||
+    "LEAKA User";
 
-  const avatar =
-    profile.avatar_url ||
-    local.avatar ||
-    "";
-
+  const avatar = profile.avatar_url || local.avatar || "";
   const cover = local.cover || "";
 
-  if ($("profileName")) {
-    $("profileName").textContent = name;
-  }
+  if ($("profileName")) $("profileName").textContent = name;
 
   if ($("profileEmail")) {
-    $("profileEmail").textContent =
-      "@" + username(profile);
+    $("profileEmail").textContent = "@" + username(profile);
   }
 
   if ($("profileBio")) {
     $("profileBio").textContent =
-      profile.bio || local.bio ||
-      "Welcome to my LEAKA space 💜";
+      profile.bio || local.bio || "Welcome to my LEAKA space 💜";
   }
 
   if ($("profileAvatar")) {
-    $("profileAvatar").innerHTML =
-      avatarHTML(avatar, name);
+    $("profileAvatar").innerHTML = avatarHTML(avatar, name);
   }
 
   if ($("editAvatar")) {
-    $("editAvatar").innerHTML =
-      avatarHTML(avatar, name);
+    $("editAvatar").innerHTML = avatarHTML(avatar, name);
   }
 
   if ($("profileBtn")) {
-    $("profileBtn").innerHTML =
-      avatarHTML(avatar, name);
+    $("profileBtn").innerHTML = avatarHTML(avatar, name);
   }
 
   if ($("profileCoverImage")) {
-    if (cover) {
-      $("profileCoverImage").src = cover;
-      $("profileCoverImage").hidden = false;
-    } else {
-      $("profileCoverImage").hidden = true;
-    }
+    $("profileCoverImage").hidden = !cover;
+    if (cover) $("profileCoverImage").src = cover;
   }
 
-  if ($("displayName")) {
-    $("displayName").value = name;
-  }
+  if ($("displayName")) $("displayName").value = name;
+  if ($("bioInput")) $("bioInput").value = profile.bio || local.bio || "";
 
-  if ($("bioInput")) {
-    $("bioInput").value =
-      profile.bio || local.bio || "";
-  }
-
-  if (cover && $("editCoverPreview")) {
-    $("editCoverPreview").innerHTML =
-      `<img src="${escapeHTML(cover)}" alt="Cover preview">`;
+  if ($("editCoverPreview")) {
+    $("editCoverPreview").innerHTML = cover
+      ? `<img src="${escapeHTML(cover)}" alt="Cover preview">`
+      : "";
   }
 
   await loadMyPosts();
@@ -468,8 +520,7 @@ async function loadAccountDetails() {
   if (!currentUser) return;
 
   if ($("accountEmail")) {
-    $("accountEmail").textContent =
-      currentUser.email;
+    $("accountEmail").textContent = currentUser.email || "";
   }
 
   if ($("accountDisplayName")) {
@@ -478,12 +529,11 @@ async function loadAccountDetails() {
   }
 }
 
-// PROFILE PICTURE
+// AVATAR
 
 $("avatarInput")?.addEventListener("change", async event => {
-  const file = event.target.files[0];
-
-  if (!file) return;
+  const file = event.target.files?.[0];
+  if (!file || !currentUser) return;
 
   if (!file.type.startsWith("image/")) {
     notify("Choose an image.", true);
@@ -491,32 +541,30 @@ $("avatarInput")?.addEventListener("change", async event => {
   }
 
   const url = await uploadMedia(file, "avatars");
-
   if (!url) return;
 
-  const { error } = await db
+  const { data, error } = await db
     .from("profiles")
     .update({ avatar_url: url })
-    .eq("id", currentUser.id);
+    .eq("id", currentUser.id)
+    .select()
+    .single();
 
   if (error) {
     notify(error.message, true);
     return;
   }
 
-  currentProfile.avatar_url = url;
-
+  currentProfile = data;
   await updateMyProfileUI();
-
   notify("Profile picture updated 💜");
 });
 
-// COVER PHOTO
+// COVER
 
 $("coverInput")?.addEventListener("change", async event => {
-  const file = event.target.files[0];
-
-  if (!file) return;
+  const file = event.target.files?.[0];
+  if (!file || !currentUser) return;
 
   if (!file.type.startsWith("image/")) {
     notify("Choose an image.", true);
@@ -524,24 +572,17 @@ $("coverInput")?.addEventListener("change", async event => {
   }
 
   const url = await uploadMedia(file, "covers");
-
   if (!url) return;
 
   const local = localProfile();
   local.cover = url;
-
-  localStorage.setItem(
-    "leaka_profile_" + currentUser.id,
-    JSON.stringify(local)
-  );
+  saveLocalProfile(local);
 
   await updateMyProfileUI();
-
   notify("Cover photo updated 💜");
 });
-// =========================================
-// PROFILE EDITOR TOGGLE
-// =========================================
+
+// PROFILE EDITOR
 
 $("editProfileToggle")?.addEventListener("click", () => {
   const editor = $("profileEditSection");
@@ -549,25 +590,22 @@ $("editProfileToggle")?.addEventListener("click", () => {
 
   if (!editor) return;
 
-  const opening = editor.hidden;
+  editor.hidden = !editor.hidden;
 
-  editor.hidden = !opening;
+  button.textContent = editor.hidden
+    ? "✏️ Edit Profile"
+    : "✕ Close Editor";
 
-  button.textContent = opening
-    ? "✕ Close Editor"
-    : "✏️ Edit Profile";
-
-  if (opening) {
-    editor.scrollIntoView({
-      behavior: "smooth",
-      block: "start"
-    });
+  if (!editor.hidden) {
+    editor.scrollIntoView({ behavior: "smooth", block: "start" });
   }
 });
 
 // SAVE PROFILE
 
 $("saveProfileBtn")?.addEventListener("click", async () => {
+  if (!currentUser) return;
+
   const name = $("displayName")?.value.trim();
   const bio = $("bioInput")?.value.trim();
 
@@ -576,7 +614,8 @@ $("saveProfileBtn")?.addEventListener("click", async () => {
     return;
   }
 
-  $("saveProfileBtn").disabled = true;
+  const button = $("saveProfileBtn");
+  setLoading(button, true, "Saving...");
 
   try {
     const { data, error } = await db
@@ -601,52 +640,53 @@ $("saveProfileBtn")?.addEventListener("click", async () => {
   } catch (error) {
     notify(error.message, true);
   } finally {
-    $("saveProfileBtn").disabled = false;
+    setLoading(button, false);
   }
 });
 
-// =========================================
+// =====================================================
 // CREATE POSTS
-// =========================================
+// =====================================================
 
 $("mediaInput")?.addEventListener("change", event => {
-  selectedMedia = event.target.files[0] || null;
+  selectedMedia = event.target.files?.[0] || null;
 
-  if (!selectedMedia) {
-    $("preview").innerHTML = "";
-    return;
-  }
+  const preview = $("preview");
+  if (!preview) return;
+
+  preview.innerHTML = "";
+
+  if (!selectedMedia) return;
 
   if (selectedMedia.size > 25 * 1024 * 1024) {
     notify("Maximum file size is 25MB.", true);
     event.target.value = "";
     selectedMedia = null;
-    $("preview").innerHTML = "";
     return;
   }
 
   const url = URL.createObjectURL(selectedMedia);
 
-  $("preview").innerHTML =
-    selectedMedia.type.startsWith("video/")
-      ? `<video src="${url}" controls playsinline></video>`
-      : `<img src="${url}" alt="Post preview">`;
+  preview.innerHTML = selectedMedia.type.startsWith("video/")
+    ? `<video src="${url}" controls playsinline></video>`
+    : `<img src="${url}" alt="Post preview">`;
 });
 
-// PUBLISH POST
-
 $("postBtn")?.addEventListener("click", async () => {
-  if (!currentUser) return;
+  if (!currentUser) {
+    notify("Please log in first.", true);
+    return;
+  }
 
-  const caption = $("caption")?.value.trim();
+  const caption = $("caption")?.value.trim() || "";
 
   if (!caption && !selectedMedia) {
     notify("Write something or add a photo/video.", true);
     return;
   }
 
-  $("postBtn").disabled = true;
-  $("postBtn").textContent = "Publishing...";
+  const button = $("postBtn");
+  setLoading(button, true, "Publishing...");
 
   try {
     let mediaUrl = null;
@@ -681,39 +721,39 @@ $("postBtn")?.addEventListener("click", async () => {
 
     notify("Your post is live! ✨");
 
-    await loadPosts();
-    await loadMyPosts();
+    await Promise.all([loadPosts(), loadMyPosts()]);
 
   } catch (error) {
     notify(error.message, true);
   } finally {
-    $("postBtn").disabled = false;
-    $("postBtn").textContent = "Publish ↗";
+    setLoading(button, false);
   }
 });
 
-// =========================================
-// LOAD FEED
-// =========================================
+// =====================================================
+// FEED
+// =====================================================
 
 async function loadPosts() {
   const container = $("posts");
 
   if (!container || !currentUser) return;
 
+  container.innerHTML = `<p class="muted">Loading posts...</p>`;
+
   const { data, error } = await db
     .from("posts")
     .select("*")
-    .order("created_at", { ascending: false });
+    .order("created_at", { ascending: false })
+    .limit(50);
 
   if (error) {
     console.error(error);
-    container.innerHTML =
-      `<p class="muted">Could not load posts.</p>`;
+    container.innerHTML = `<p class="muted">Could not load posts.</p>`;
     return;
   }
 
-  if (!data.length) {
+  if (!data?.length) {
     container.innerHTML = `
       <div class="empty-state">
         <div>✦</div>
@@ -725,20 +765,41 @@ async function loadPosts() {
 
   container.innerHTML = "";
 
+  const profiles = new Map();
+  const likesMap = new Map();
+
+  const userIds = [...new Set(data.map(post => post.user_id))];
+
+  const { data: profileData } = await db
+    .from("profiles")
+    .select("*")
+    .in("id", userIds);
+
+  (profileData || []).forEach(profile => {
+    profiles.set(profile.id, profile);
+  });
+
+  const postIds = data.map(post => post.id);
+
+  const { data: likes } = await db
+    .from("likes")
+    .select("post_id,user_id")
+    .in("post_id", postIds);
+
+  (likes || []).forEach(like => {
+    if (!likesMap.has(like.post_id)) {
+      likesMap.set(like.post_id, []);
+    }
+    likesMap.get(like.post_id).push(like);
+  });
+
   for (const post of data) {
-    const profile = await getProfile(post.user_id)
-      .catch(() => null);
+    const profile = profiles.get(post.user_id);
+    const postLikes = likesMap.get(post.id) || [];
 
-    const { data: likes } = await db
-      .from("likes")
-      .select("user_id")
-      .eq("post_id", post.id);
-
-    const liked = likes?.some(
+    const liked = postLikes.some(
       like => like.user_id === currentUser.id
     );
-
-    const count = likes?.length || 0;
 
     const card = document.createElement("article");
     card.className = "post-card";
@@ -746,44 +807,31 @@ async function loadPosts() {
     card.innerHTML = `
       <div class="post-header">
         <div class="post-avatar">
-          ${avatarHTML(
-            profile?.avatar_url,
-            profileName(profile)
-          )}
+          ${avatarHTML(profile?.avatar_url, profileName(profile))}
         </div>
 
         <div>
-          <div class="post-user">
-            ${escapeHTML(profileName(profile))}
-          </div>
+          <div class="post-user">${escapeHTML(profileName(profile))}</div>
           <div class="post-time">
-            @${escapeHTML(username(profile))}
+            @${escapeHTML(username(profile))} · ${timeAgo(post.created_at)}
           </div>
         </div>
       </div>
 
-      ${
-        post.caption
-          ? `<p class="post-caption">${escapeHTML(post.caption)}</p>`
-          : ""
-      }
+      ${post.caption
+        ? `<p class="post-caption">${escapeHTML(post.caption)}</p>`
+        : ""}
 
-      ${
-        post.media_url
-          ? post.media_type === "video"
-            ? `<video class="post-media"
-                 src="${escapeHTML(post.media_url)}"
-                 controls playsinline></video>`
-            : `<img class="post-media"
-                 src="${escapeHTML(post.media_url)}"
-                 alt="Post">`
-          : ""
-      }
+      ${post.media_url
+        ? post.media_type === "video"
+          ? `<video class="post-media" src="${escapeHTML(post.media_url)}" controls playsinline></video>`
+          : `<img class="post-media" src="${escapeHTML(post.media_url)}" alt="Post" loading="lazy">`
+        : ""}
 
       <div class="post-actions">
         <button class="action-btn ${liked ? "liked" : ""}"
           data-like="${escapeHTML(post.id)}">
-          ${liked ? "♥" : "♡"} ${count} Likes
+          ${liked ? "♥" : "♡"} ${postLikes.length} Likes
         </button>
 
         <button class="action-btn"
@@ -791,55 +839,47 @@ async function loadPosts() {
           ♧ Comment
         </button>
 
-        ${
-          post.user_id === currentUser.id
-            ? `<button class="action-btn"
-                 data-delete-post="${escapeHTML(post.id)}">
-                 Delete
-               </button>`
-            : ""
-        }
+        ${post.user_id === currentUser.id
+          ? `<button class="action-btn" data-delete-post="${escapeHTML(post.id)}">Delete</button>`
+          : ""}
       </div>
 
       <div class="comment-area">
         <input id="comment-${escapeHTML(post.id)}"
           placeholder="Write a comment...">
-
-        <button data-comment="${escapeHTML(post.id)}">
-          Send
-        </button>
+        <button data-comment="${escapeHTML(post.id)}">Send</button>
       </div>
 
-      <div class="comments"
-        id="comments-${escapeHTML(post.id)}"></div>
+      <div class="comments" id="comments-${escapeHTML(post.id)}">
+        Loading comments...
+      </div>
     `;
 
     container.appendChild(card);
-
     loadComments(post.id);
   }
 }
 
-// =========================================
+// =====================================================
 // LIKES
-// =========================================
+// =====================================================
 
 document.addEventListener("click", async event => {
   const button = event.target.closest("[data-like]");
-
   if (!button || !currentUser) return;
 
   const postId = button.dataset.like;
-
   button.disabled = true;
 
   try {
-    const { data: existing } = await db
+    const { data: existing, error: findError } = await db
       .from("likes")
       .select("id")
       .eq("post_id", postId)
       .eq("user_id", currentUser.id)
       .maybeSingle();
+
+    if (findError) throw findError;
 
     if (existing) {
       const { error } = await db
@@ -861,29 +901,31 @@ document.addEventListener("click", async event => {
     }
 
     await loadPosts();
-    await loadMyPosts();
 
   } catch (error) {
     notify(error.message, true);
+    button.disabled = false;
   }
 });
 
-// =========================================
+// =====================================================
 // COMMENTS
-// =========================================
+// =====================================================
 
 async function loadComments(postId) {
+  const container = $("comments-" + postId);
+  if (!container) return;
+
   const { data, error } = await db
     .from("comments")
     .select("*")
     .eq("post_id", postId)
-    .order("created_at");
+    .order("created_at", { ascending: true });
 
-  if (error) return;
-
-  const container = $("comments-" + postId);
-
-  if (!container) return;
+  if (error) {
+    container.textContent = "Comments unavailable.";
+    return;
+  }
 
   container.innerHTML = "";
 
@@ -904,15 +946,16 @@ async function loadComments(postId) {
 
 document.addEventListener("click", async event => {
   const button = event.target.closest("[data-comment]");
-
   if (!button || !currentUser) return;
 
   const postId = button.dataset.comment;
   const input = $("comment-" + postId);
-
   const content = input?.value.trim();
 
-  if (!content) return;
+  if (!content) {
+    notify("Write a comment first.", true);
+    return;
+  }
 
   button.disabled = true;
 
@@ -928,7 +971,6 @@ document.addEventListener("click", async event => {
     if (error) throw error;
 
     input.value = "";
-
     await loadComments(postId);
 
   } catch (error) {
@@ -940,24 +982,22 @@ document.addEventListener("click", async event => {
 
 document.addEventListener("click", event => {
   const button = event.target.closest("[data-comment-focus]");
-
   if (!button) return;
 
   $("comment-" + button.dataset.commentFocus)?.focus();
 });
 
-// =========================================
+// =====================================================
 // DELETE POSTS
-// =========================================
+// =====================================================
 
 document.addEventListener("click", async event => {
   const button = event.target.closest("[data-delete-post]");
-
   if (!button || !currentUser) return;
 
-  if (!confirm("Are you sure you want to delete this post?")) {
-    return;
-  }
+  if (!confirm("Are you sure you want to delete this post?")) return;
+
+  button.disabled = true;
 
   const { error } = await db
     .from("posts")
@@ -967,18 +1007,18 @@ document.addEventListener("click", async event => {
 
   if (error) {
     notify(error.message, true);
+    button.disabled = false;
     return;
   }
 
   notify("Post deleted.");
 
-  await loadPosts();
-  await loadMyPosts();
+  await Promise.all([loadPosts(), loadMyPosts()]);
 });
 
-// =========================================
-// MY PROFILE POSTS
-// =========================================
+// =====================================================
+// MY PROFILE POSTS AND COUNTS
+// =====================================================
 
 async function loadMyPosts() {
   if (!currentUser) return;
@@ -994,24 +1034,23 @@ async function loadMyPosts() {
     return;
   }
 
+  const posts = data || [];
+
   if ($("postCount")) {
-    $("postCount").textContent = data.length;
+    $("postCount").textContent = posts.length;
   }
 
   const container = $("profilePosts");
 
   if (container) {
-    container.innerHTML = data.length
-      ? data.map(post => `
+    container.innerHTML = posts.length
+      ? posts.map(post => `
           <div class="public-profile-post">
-            ${
-              post.media_url
-                ? post.media_type === "video"
-                  ? `<video src="${escapeHTML(post.media_url)}"
-                       muted playsinline></video>`
-                  : `<img src="${escapeHTML(post.media_url)}"
-                       alt="Post">`
-                : `<div>${escapeHTML(post.caption)}</div>`
+            ${post.media_url
+              ? post.media_type === "video"
+                ? `<video src="${escapeHTML(post.media_url)}" muted playsinline controls></video>`
+                : `<img src="${escapeHTML(post.media_url)}" alt="Post" loading="lazy">`
+              : `<div>${escapeHTML(post.caption)}</div>`
             }
           </div>
         `).join("")
@@ -1020,8 +1059,7 @@ async function loadMyPosts() {
             <div>✦</div>
             <h3>Your story starts here</h3>
             <p>Your posts will appear here.</p>
-          </div>
-        `;
+          </div>`;
   }
 
   await loadMyCounts();
@@ -1030,33 +1068,34 @@ async function loadMyPosts() {
 async function loadMyCounts() {
   if (!currentUser) return;
 
-  const { count: followers } = await db
-    .from("follows")
-    .select("*", { count: "exact", head: true })
-    .eq("following_id", currentUser.id);
+  const [followers, following] = await Promise.all([
+    db.from("follows")
+      .select("*", { count: "exact", head: true })
+      .eq("following_id", currentUser.id),
 
-  const { count: following } = await db
-    .from("follows")
-    .select("*", { count: "exact", head: true })
-    .eq("follower_id", currentUser.id);
+    db.from("follows")
+      .select("*", { count: "exact", head: true })
+      .eq("follower_id", currentUser.id)
+  ]);
 
   if ($("followerCount")) {
-    $("followerCount").textContent = followers || 0;
+    $("followerCount").textContent = followers.count || 0;
   }
 
   if ($("followingCount")) {
-    $("followingCount").textContent = following || 0;
+    $("followingCount").textContent = following.count || 0;
   }
 }
 
-// =========================================
+// =====================================================
 // SEARCH
-// =========================================
+// =====================================================
 
 async function loadSearch() {
   const input = $("search");
+  if (!input || input.dataset.leakaBound) return;
 
-  if (!input) return;
+  input.dataset.leakaBound = "true";
 
   input.addEventListener("input", () => {
     clearTimeout(searchTimer);
@@ -1064,13 +1103,11 @@ async function loadSearch() {
     const query = input.value.trim();
 
     if (query.length < 2) {
-      $("searchResults").innerHTML = "";
+      if ($("searchResults")) $("searchResults").innerHTML = "";
       return;
     }
 
-    searchTimer = setTimeout(() => {
-      searchUsers(query);
-    }, 350);
+    searchTimer = setTimeout(() => searchUsers(query), 350);
   });
 }
 
@@ -1078,7 +1115,6 @@ async function searchUsers(query) {
   if (!currentUser) return;
 
   const results = $("searchResults");
-
   if (!results) return;
 
   const safeQuery = query.replace(/[,%()]/g, " ");
@@ -1096,6 +1132,8 @@ async function searchUsers(query) {
     return;
   }
 
+  if ($("search")?.value.trim() !== query) return;
+
   results.innerHTML = "";
 
   const people = (data || []).filter(
@@ -1103,26 +1141,18 @@ async function searchUsers(query) {
   );
 
   if (!people.length) {
-    results.innerHTML = `
-      <div class="empty-state">
-        No people found.
-      </div>`;
+    results.innerHTML = `<div class="empty-state">No people found.</div>`;
     return;
   }
 
   people.forEach(profile => {
     const item = document.createElement("div");
-
     item.className = "search-user";
 
     item.innerHTML = `
       <div class="search-user-avatar">
-        ${avatarHTML(
-          profile.avatar_url,
-          profileName(profile)
-        )}
+        ${avatarHTML(profile.avatar_url, profileName(profile))}
       </div>
-
       <div>
         <strong>${escapeHTML(profileName(profile))}</strong>
         <span>@${escapeHTML(username(profile))}</span>
@@ -1131,7 +1161,7 @@ async function searchUsers(query) {
 
     item.addEventListener("click", () => {
       results.innerHTML = "";
-      inputBlur();
+      $("search")?.blur();
       openPublicProfile(profile.id);
     });
 
@@ -1139,13 +1169,9 @@ async function searchUsers(query) {
   });
 }
 
-function inputBlur() {
-  $("search")?.blur();
-}
-
-// =========================================
+// =====================================================
 // PUBLIC PROFILES
-// =========================================
+// =====================================================
 
 function createProfileOverlay() {
   let overlay = $("publicProfileOverlay");
@@ -1154,13 +1180,10 @@ function createProfileOverlay() {
     overlay = document.createElement("div");
     overlay.id = "publicProfileOverlay";
     overlay.hidden = true;
-
     document.body.appendChild(overlay);
 
     overlay.addEventListener("click", event => {
-      if (event.target === overlay) {
-        closePublicProfile();
-      }
+      if (event.target === overlay) closePublicProfile();
     });
   }
 
@@ -1169,11 +1192,12 @@ function createProfileOverlay() {
 
 function closePublicProfile() {
   const overlay = $("publicProfileOverlay");
-
   if (overlay) overlay.hidden = true;
 
   activePublicUser = null;
 }
+
+window.closePublicProfile = closePublicProfile;
 
 async function openPublicProfile(userId) {
   if (!currentUser) return;
@@ -1184,22 +1208,19 @@ async function openPublicProfile(userId) {
   }
 
   const overlay = createProfileOverlay();
-
   overlay.hidden = false;
 
   overlay.innerHTML = `
     <div class="public-profile-card">
       <div class="public-profile-cover">
-        <button class="public-profile-close"
-          onclick="closePublicProfile()">×</button>
+        <button class="public-profile-close" onclick="closePublicProfile()">×</button>
       </div>
-
       <div class="public-profile-body">
         <div class="public-profile-loading">
-  <div class="leaka-spinner"></div>
-  <strong>Loading LEAKA profile...</strong>
-  <small>Connecting your world 💜</small>
-</div>
+          <div class="leaka-spinner"></div>
+          <strong>Loading LEAKA profile...</strong>
+          <small>Connecting your world 💜</small>
+        </div>
       </div>
     </div>
   `;
@@ -1210,8 +1231,7 @@ async function openPublicProfile(userId) {
     overlay.innerHTML = `
       <div class="public-profile-card">
         <div class="public-profile-body">
-          <button class="public-profile-close"
-            onclick="closePublicProfile()">×</button>
+          <button class="public-profile-close" onclick="closePublicProfile()">×</button>
           <p>This profile could not be found.</p>
         </div>
       </div>
@@ -1221,167 +1241,111 @@ async function openPublicProfile(userId) {
 
   activePublicUser = profile;
 
-  const local = (() => {
-    try {
-      return JSON.parse(
-        localStorage.getItem("leaka_profile_" + userId) || "{}"
-      );
-    } catch {
-      return {};
-    }
-  })();
+  const local = localProfile(userId);
 
-  const { data: follow } = await db
-    .from("follows")
-    .select("follower_id")
-    .eq("follower_id", currentUser.id)
-    .eq("following_id", userId)
-    .maybeSingle();
+  const [followResult, requestResult, followersResult, followingResult] =
+    await Promise.all([
+      db.from("follows")
+        .select("follower_id")
+        .eq("follower_id", currentUser.id)
+        .eq("following_id", userId)
+        .maybeSingle(),
 
-  const { data: request } = await db
-    .from("follow_requests")
-    .select("id,status")
-    .eq("requester_id", currentUser.id)
-    .eq("receiver_id", userId)
-    .eq("status", "pending")
-    .maybeSingle();
+      db.from("follow_requests")
+        .select("id,status")
+        .eq("requester_id", currentUser.id)
+        .eq("receiver_id", userId)
+        .eq("status", "pending")
+        .maybeSingle(),
 
-  const { count: followers } = await db
-    .from("follows")
-    .select("*", { count: "exact", head: true })
-    .eq("following_id", userId);
+      db.from("follows")
+        .select("*", { count: "exact", head: true })
+        .eq("following_id", userId),
 
-  const { count: following } = await db
-    .from("follows")
-    .select("*", { count: "exact", head: true })
-    .eq("follower_id", userId);
+      db.from("follows")
+        .select("*", { count: "exact", head: true })
+        .eq("follower_id", userId)
+    ]);
+
+  if (activePublicUser?.id !== userId) return;
 
   const isPrivate = profile.is_private === true;
-  const isFollowing = !!follow;
-  const isPending = !!request;
-
+  const isFollowing = !!followResult.data;
+  const isPending = !!requestResult.data;
   const canSeePosts = !isPrivate || isFollowing;
-
-  const cover = local.cover || "";
-  const avatar = profile.avatar_url || "";
 
   overlay.innerHTML = `
     <div class="public-profile-card">
-
       <div class="public-profile-cover">
-        ${cover ? `<img src="${escapeHTML(cover)}" alt="">` : ""}
-
-        <button class="public-profile-close"
-          onclick="closePublicProfile()">×</button>
+        ${local.cover
+          ? `<img src="${escapeHTML(local.cover)}" alt="Cover">`
+          : ""}
+        <button class="public-profile-close" onclick="closePublicProfile()">×</button>
       </div>
 
       <div class="public-profile-body">
-
         <div class="public-profile-top">
-
           <div class="public-profile-avatar">
-            ${avatarHTML(avatar, profileName(profile))}
+            ${avatarHTML(profile.avatar_url, profileName(profile))}
           </div>
 
           <div class="public-profile-actions">
-
-            <button class="public-follow-btn
-              ${isFollowing ? "following" : ""}"
+            <button class="public-follow-btn ${isFollowing ? "following" : ""}"
               id="publicFollowBtn">
-
-              ${
-                isFollowing
-                  ? "✓ Following"
-                  : isPending
-                    ? "Requested"
-                    : "Follow"
-              }
-
+              ${isFollowing ? "✓ Following" : isPending ? "Requested" : "Follow"}
             </button>
 
             <button class="public-message-btn"
               onclick="notify('Messaging is coming soon 💜')">
               Message
             </button>
-
           </div>
         </div>
 
-        <h2 class="public-profile-name">
-          ${escapeHTML(profileName(profile))}
-        </h2>
-
-        <p class="public-profile-handle">
-          @${escapeHTML(username(profile))}
-        </p>
-
-        <p class="public-profile-bio">
-          ${escapeHTML(profile.bio || "Living my LEAKA life 💜")}
-        </p>
+        <h2 class="public-profile-name">${escapeHTML(profileName(profile))}</h2>
+        <p class="public-profile-handle">@${escapeHTML(username(profile))}</p>
+        <p class="public-profile-bio">${escapeHTML(profile.bio || "Living my LEAKA life 💜")}</p>
 
         <div class="public-profile-stats">
-
-          <div>
-            <strong>${canSeePosts ? "..." : "—"}</strong>
-            <span>Posts</span>
-          </div>
-
-          <div>
-            <strong>${followers || 0}</strong>
-            <span>Followers</span>
-          </div>
-
-          <div>
-            <strong>${following || 0}</strong>
-            <span>Following</span>
-          </div>
-
+          <div><strong>${canSeePosts ? "..." : "—"}</strong><span>Posts</span></div>
+          <div><strong>${followersResult.count || 0}</strong><span>Followers</span></div>
+          <div><strong>${followingResult.count || 0}</strong><span>Following</span></div>
         </div>
 
-        ${
-          canSeePosts
-            ? `
-              <div class="public-profile-tabs">
-                <button class="selected">Posts</button>
-              </div>
-
-              <div class="public-profile-posts"
-                id="publicProfilePosts">
-                <div class="public-profile-post-empty">
-                  Loading posts...
-                </div>
-              </div>
-            `
-            : `
-              <div class="public-profile-private">
-                <div style="font-size:38px">🔒</div>
-                <strong>This account is private</strong>
-                Follow this account to see their posts.
-              </div>
-            `
+        ${canSeePosts
+          ? `
+            <div class="public-profile-tabs">
+              <button class="selected">Posts</button>
+            </div>
+            <div class="public-profile-posts" id="publicProfilePosts">
+              <div class="public-profile-post-empty">Loading posts...</div>
+            </div>
+          `
+          : `
+            <div class="public-profile-private">
+              <div style="font-size:38px">🔒</div>
+              <strong>This account is private</strong>
+              <p>Follow this account to see their posts.</p>
+            </div>
+          `
         }
-
       </div>
     </div>
   `;
 
-  if (canSeePosts) {
-    await loadPublicPosts(userId);
-  }
+  $("publicFollowBtn")?.addEventListener("click", toggleFollow);
 
-  $("publicFollowBtn")?.addEventListener(
-    "click",
-    toggleFollow
-  );
+  if (canSeePosts) await loadPublicPosts(userId);
 }
 
-// =========================================
+window.openPublicProfile = openPublicProfile;
+
+// =====================================================
 // PUBLIC PROFILE POSTS
-// =========================================
+// =====================================================
 
 async function loadPublicPosts(userId) {
   const container = $("publicProfilePosts");
-
   if (!container) return;
 
   const { data, error } = await db
@@ -1390,11 +1354,10 @@ async function loadPublicPosts(userId) {
     .eq("user_id", userId)
     .order("created_at", { ascending: false });
 
+  if (activePublicUser?.id !== userId) return;
+
   if (error) {
-    container.innerHTML = `
-      <div class="public-profile-post-empty">
-        Posts could not be loaded.
-      </div>`;
+    container.innerHTML = `<div class="public-profile-post-empty">Posts could not be loaded.</div>`;
     return;
   }
 
@@ -1402,9 +1365,7 @@ async function loadPublicPosts(userId) {
     .closest(".public-profile-body")
     ?.querySelector(".public-profile-stats strong");
 
-  if (countElement) {
-    countElement.textContent = data.length;
-  }
+  if (countElement) countElement.textContent = data.length;
 
   if (!data.length) {
     container.innerHTML = `
@@ -1416,26 +1377,19 @@ async function loadPublicPosts(userId) {
 
   container.innerHTML = data.map(post => `
     <div class="public-profile-post">
-
-      ${
-        post.media_url
-          ? post.media_type === "video"
-            ? `<video src="${escapeHTML(post.media_url)}"
-                 muted playsinline></video>`
-            : `<img src="${escapeHTML(post.media_url)}"
-                 alt="">`
-          : `<div style="padding:12px;font-size:12px">
-               ${escapeHTML(post.caption)}
-             </div>`
+      ${post.media_url
+        ? post.media_type === "video"
+          ? `<video src="${escapeHTML(post.media_url)}" muted playsinline controls></video>`
+          : `<img src="${escapeHTML(post.media_url)}" alt="Post" loading="lazy">`
+        : `<div style="padding:12px;font-size:12px">${escapeHTML(post.caption)}</div>`
       }
-
     </div>
   `).join("");
 }
 
-// =========================================
+// =====================================================
 // FOLLOW / UNFOLLOW
-// =========================================
+// =====================================================
 
 async function toggleFollow() {
   if (!currentUser || !activePublicUser) return;
@@ -1448,12 +1402,14 @@ async function toggleFollow() {
   button.disabled = true;
 
   try {
-    const { data: existingFollow } = await db
+    const { data: existingFollow, error: followCheckError } = await db
       .from("follows")
       .select("follower_id")
       .eq("follower_id", currentUser.id)
       .eq("following_id", targetId)
       .maybeSingle();
+
+    if (followCheckError) throw followCheckError;
 
     if (existingFollow) {
       const { error } = await db
@@ -1465,18 +1421,19 @@ async function toggleFollow() {
       if (error) throw error;
 
       notify("Unfollowed.");
-
       await openPublicProfile(targetId);
       return;
     }
 
-    const { data: existingRequest } = await db
+    const { data: existingRequest, error: requestCheckError } = await db
       .from("follow_requests")
       .select("id")
       .eq("requester_id", currentUser.id)
       .eq("receiver_id", targetId)
       .eq("status", "pending")
       .maybeSingle();
+
+    if (requestCheckError) throw requestCheckError;
 
     if (existingRequest) {
       notify("Your request is already pending.");
@@ -1528,16 +1485,13 @@ async function toggleFollow() {
     notify(error.message, true);
   } finally {
     const currentButton = $("publicFollowBtn");
-
-    if (currentButton) {
-      currentButton.disabled = false;
-    }
+    if (currentButton) currentButton.disabled = false;
   }
 }
 
-// =========================================
+// =====================================================
 // NOTIFICATIONS
-// =========================================
+// =====================================================
 
 async function createNotification(userId, type, message) {
   if (!currentUser) return;
@@ -1552,15 +1506,8 @@ async function createNotification(userId, type, message) {
       is_read: false
     });
 
-  if (error) {
-    console.error("Notification error:", error);
-  }
+  if (error) console.error("Notification error:", error);
 }
-
-
-// =========================================
-// LEAKA NOTIFICATIONS
-// =========================================
 
 async function loadNotifications() {
   if (!currentUser) return;
@@ -1575,10 +1522,9 @@ async function loadNotifications() {
     .limit(50);
 
   if (error) {
-    console.error("Notifications:", error);
+    console.error(error);
     if (container) {
-      container.innerHTML =
-        '<p class="muted">Could not load notifications.</p>';
+      container.innerHTML = `<p class="muted">Could not load notifications.</p>`;
     }
     return;
   }
@@ -1601,8 +1547,7 @@ async function loadNotifications() {
         <div>♡</div>
         <h3>You're all caught up</h3>
         <p>Your LEAKA activity will appear here.</p>
-      </div>
-    `;
+      </div>`;
     return;
   }
 
@@ -1615,16 +1560,12 @@ async function loadNotifications() {
 
     const item = document.createElement("div");
 
-    item.className = `notification-item ${
-      notification.is_read ? "" : "unread"
-    }`;
+    item.className =
+      `notification-item ${notification.is_read ? "" : "unread"}`;
 
     item.innerHTML = `
       <div class="notification-avatar">
-        ${avatarHTML(
-          actor?.avatar_url,
-          profileName(actor)
-        )}
+        ${avatarHTML(actor?.avatar_url, profileName(actor))}
       </div>
 
       <div class="notification-content">
@@ -1632,13 +1573,10 @@ async function loadNotifications() {
           <strong>${escapeHTML(profileName(actor))}</strong>
           ${escapeHTML(notification.message || "interacted with you")}
         </p>
-
-        <small>
-          ${new Date(notification.created_at).toLocaleString()}
-        </small>
+        <small>${timeAgo(notification.created_at)}</small>
       </div>
 
-      ${notification.is_read ? "" : '<span>💜</span>'}
+      ${notification.is_read ? "" : "<span>💜</span>"}
     `;
 
     item.addEventListener("click", async () => {
@@ -1679,13 +1617,12 @@ $("markAllRead")?.addEventListener("click", async () => {
   }
 
   await loadNotifications();
-
   notify("All notifications marked as read 💜");
 });
 
-// =========================================
+// =====================================================
 // FOLLOW REQUESTS
-// =========================================
+// =====================================================
 
 async function loadFollowRequests() {
   if (!currentUser) return [];
@@ -1706,15 +1643,12 @@ async function loadFollowRequests() {
 }
 
 async function renderFollowRequests(container) {
-  if (!container) return;
+  if (!container || !currentUser) return;
 
   const requests = await loadFollowRequests();
 
   if (!requests.length) {
-    container.innerHTML = `
-      <p class="muted">
-        No pending follow requests.
-      </p>`;
+    container.innerHTML = `<p class="muted">No pending follow requests.</p>`;
     return;
   }
 
@@ -1727,15 +1661,11 @@ async function renderFollowRequests(container) {
     if (!profile) continue;
 
     const item = document.createElement("div");
-
     item.className = "request-list-item";
 
     item.innerHTML = `
       <div class="request-avatar">
-        ${avatarHTML(
-          profile.avatar_url,
-          profileName(profile)
-        )}
+        ${avatarHTML(profile.avatar_url, profileName(profile))}
       </div>
 
       <div class="request-info">
@@ -1743,14 +1673,10 @@ async function renderFollowRequests(container) {
         <small>@${escapeHTML(username(profile))}</small>
       </div>
 
-      <button data-accept-request="${escapeHTML(request.id)}">
-        Accept
-      </button>
+      <button data-accept-request="${escapeHTML(request.id)}">Accept</button>
 
       <button class="decline"
-        data-decline-request="${escapeHTML(request.id)}">
-        ×
-      </button>
+        data-decline-request="${escapeHTML(request.id)}">×</button>
     `;
 
     container.appendChild(item);
@@ -1765,6 +1691,7 @@ async function handleFollowRequest(requestId, accepted) {
     .select("*")
     .eq("id", requestId)
     .eq("receiver_id", currentUser.id)
+    .eq("status", "pending")
     .single();
 
   if (fetchError) {
@@ -1778,7 +1705,8 @@ async function handleFollowRequest(requestId, accepted) {
       status: accepted ? "accepted" : "declined"
     })
     .eq("id", requestId)
-    .eq("receiver_id", currentUser.id);
+    .eq("receiver_id", currentUser.id)
+    .eq("status", "pending");
 
   if (error) {
     notify(error.message, true);
@@ -1810,50 +1738,32 @@ async function handleFollowRequest(requestId, accepted) {
     notify("Follow request declined.");
   }
 
-  if ($("followRequestsList")) {
-    await renderFollowRequests($("followRequestsList"));
-  }
-
+  await renderFollowRequests($("followRequestsList"));
   await loadMyCounts();
 }
 
 document.addEventListener("click", event => {
-  const accept = event.target.closest(
-    "[data-accept-request]"
-  );
-
-  const decline = event.target.closest(
-    "[data-decline-request]"
-  );
+  const accept = event.target.closest("[data-accept-request]");
+  const decline = event.target.closest("[data-decline-request]");
 
   if (accept) {
-    handleFollowRequest(
-      accept.dataset.acceptRequest,
-      true
-    );
+    handleFollowRequest(accept.dataset.acceptRequest, true);
   }
 
   if (decline) {
-    handleFollowRequest(
-      decline.dataset.declineRequest,
-      false
-    );
+    handleFollowRequest(decline.dataset.declineRequest, false);
   }
 });
 
-// =========================================
+// =====================================================
 // PROFILE TABS
-// =========================================
+// =====================================================
 
 document.querySelectorAll("[data-profile-tab]")
   .forEach(button => {
-
     button.addEventListener("click", () => {
-
       document.querySelectorAll("[data-profile-tab]")
-        .forEach(tab => {
-          tab.classList.remove("selected");
-        });
+        .forEach(tab => tab.classList.remove("selected"));
 
       button.classList.add("selected");
 
@@ -1861,165 +1771,157 @@ document.querySelectorAll("[data-profile-tab]")
 
       if (type === "posts") {
         loadMyPosts();
-
       } else if (type === "videos") {
+        loadMyPosts();
         notify("Video filtering is coming soon 💜");
-
       } else {
         notify("Liked posts view is coming soon 💜");
       }
     });
   });
 
- // =========================================
- // LEAKA STORIES SYSTEM
- // =========================================
+// =====================================================
+// STORIES
+// =====================================================
 
- async function loadStories() {
-   const container = $("storiesContainer");
+async function loadStories() {
+  const container = $("storiesContainer");
 
-   if (!container || !currentUser) return;
+  if (!container || !currentUser) return;
 
-   const { data, error } = await db
-     .from("stories")
-     .select("*")
-     .gt("expires_at", new Date().toISOString())
-     .order("created_at", { ascending: false });
+  const { data, error } = await db
+    .from("stories")
+    .select("*")
+    .gt("expires_at", new Date().toISOString())
+    .order("created_at", { ascending: false });
 
-   if (error) {
-     console.error("Stories error:", error);
-     return;
-   }
+  if (error) {
+    console.error("Stories:", error);
+    return;
+  }
 
-   container.innerHTML = `
-     <button id="createStoryBtn"
-       class="story-create-button">
-       <span>＋</span>
-       <small>Add Story</small>
-     </button>
-   `;
+  container.innerHTML = `
+    <button id="createStoryBtn" class="story-create-button">
+      <span>＋</span>
+      <small>Add Story</small>
+    </button>
+  `;
 
-   $("createStoryBtn")?.addEventListener("click", () => {
-     $("storyInput")?.click();
-   });
+  $("createStoryBtn")?.addEventListener("click", () => {
+    $("storyInput")?.click();
+  });
 
-   for (const story of data || []) {
-     const profile = await getProfile(story.user_id)
-       .catch(() => null);
+  const profiles = new Map();
 
-     const item = document.createElement("button");
+  for (const story of data || []) {
+    if (!profiles.has(story.user_id)) {
+      profiles.set(
+        story.user_id,
+        await getProfile(story.user_id).catch(() => null)
+      );
+    }
 
-     item.className = "story-item";
+    const profile = profiles.get(story.user_id);
 
-     item.innerHTML = `
-       <div class="story-ring">
-         <div class="story-avatar">
-           ${avatarHTML(
-             profile?.avatar_url,
-             profileName(profile)
-           )}
-         </div>
-       </div>
+    const item = document.createElement("button");
+    item.className = "story-item";
 
-       <small>
-         ${escapeHTML(profileName(profile))}
-       </small>
-     `;
+    item.innerHTML = `
+      <div class="story-ring">
+        <div class="story-avatar">
+          ${avatarHTML(profile?.avatar_url, profileName(profile))}
+        </div>
+      </div>
+      <small>${escapeHTML(profileName(profile))}</small>
+    `;
 
-     item.addEventListener("click", () => {
-       openStory(story);
-     });
+    item.addEventListener("click", () => openStory(story));
 
-     container.appendChild(item);
-   }
- }
+    container.appendChild(item);
+  }
+}
 
- // CREATE STORY
+// CREATE STORY
 
- $("storyInput")?.addEventListener("change", async event => {
-   const file = event.target.files[0];
+$("storyInput")?.addEventListener("change", async event => {
+  const file = event.target.files?.[0];
 
-   if (!file || !currentUser) return;
+  if (!file || !currentUser) return;
 
-   if (
-     !file.type.startsWith("image/") &&
-     !file.type.startsWith("video/")
-   ) {
-     notify("Choose an image or video.", true);
-     return;
-   }
+  if (
+    !file.type.startsWith("image/") &&
+    !file.type.startsWith("video/")
+  ) {
+    notify("Choose an image or video.", true);
+    event.target.value = "";
+    return;
+  }
 
-   if (file.size > 25 * 1024 * 1024) {
-     notify("Maximum file size is 25MB.", true);
-     return;
-   }
+  if (file.size > 25 * 1024 * 1024) {
+    notify("Maximum file size is 25MB.", true);
+    event.target.value = "";
+    return;
+  }
 
-   notify("Uploading your story...");
+  notify("Uploading your story...");
 
-   try {
-     const url = await uploadMedia(file, "stories");
+  try {
+    const url = await uploadMedia(file, "stories");
+    if (!url) return;
 
-     if (!url) return;
+    const mediaType = file.type.startsWith("video/")
+      ? "video"
+      : "image";
 
-     const mediaType = file.type.startsWith("video/")
-       ? "video"
-       : "image";
+    const { error } = await db
+      .from("stories")
+      .insert({
+        user_id: currentUser.id,
+        media_url: url,
+        media_type: mediaType
+      });
 
-     const { error } = await db
-       .from("stories")
-       .insert({
-         user_id: currentUser.id,
-         media_url: url,
-         media_type: mediaType
-       });
+    if (error) throw error;
 
-     if (error) throw error;
+    notify("Your story is live! 💜");
+    await loadStories();
 
-     notify("Your story is live! 💜");
+  } catch (error) {
+    notify("Story publishing failed: " + error.message, true);
+  } finally {
+    event.target.value = "";
+  }
+});
 
-     await loadStories();
+// OPEN STORY
 
-   } catch (error) {
-     console.error(error);
-     notify("Story publishing failed: " + error.message, true);
-   } finally {
-     event.target.value = "";
-   }
- });
+function openStory(story) {
+  let viewer = $("storyViewer");
 
- // OPEN STORY VIEWER
+  if (!viewer) {
+    viewer = document.createElement("div");
+    viewer.id = "storyViewer";
+    document.body.appendChild(viewer);
+  }
 
- function openStory(story) {
-   let viewer = $("storyViewer");
+  const media = story.media_type === "video"
+    ? `<video src="${escapeHTML(story.media_url)}" autoplay controls playsinline></video>`
+    : `<img src="${escapeHTML(story.media_url)}" alt="Story">`;
 
-   if (!viewer) {
-     viewer = document.createElement("div");
-     viewer.id = "storyViewer";
-     document.body.appendChild(viewer);
-   }
+  viewer.innerHTML = `
+    <button class="story-close"
+      onclick="document.getElementById('storyViewer').hidden=true">×</button>
+    <div class="story-viewer-content">${media}</div>
+  `;
 
-   const media = story.media_type === "video"
-     ? `<video src="${escapeHTML(story.media_url)}"
-          autoplay controls playsinline></video>`
-     : `<img src="${escapeHTML(story.media_url)}" alt="Story">`;
+  viewer.hidden = false;
+}
 
-   viewer.innerHTML = `
-     <button class="story-close"
-       onclick="document.getElementById('storyViewer').hidden=true">
-       ×
-     </button>
+window.openStory = openStory;
 
-     <div class="story-viewer-content">
-       ${media}
-     </div>
-   `;
-
-   viewer.hidden = false;
- }
-
-// =========================================
+// =====================================================
 // PRIVACY
-// =========================================
+// =====================================================
 
 async function loadPrivacySetting() {
   if (!currentUser || !$("privateAccount")) return;
@@ -2028,28 +1930,23 @@ async function loadPrivacySetting() {
     !!currentProfile?.is_private;
 }
 
-$("privateAccount")?.addEventListener(
-  "change",
-  async event => {
+$("privateAccount")?.addEventListener("change", async event => {
+  if (!currentUser) return;
 
-    if (!currentUser) return;
+  const checkbox = event.target;
+  const isPrivate = checkbox.checked;
 
-    const isPrivate = event.target.checked;
+  checkbox.disabled = true;
 
+  try {
     const { data, error } = await db
       .from("profiles")
-      .update({
-        is_private: isPrivate
-      })
+      .update({ is_private: isPrivate })
       .eq("id", currentUser.id)
       .select()
       .single();
 
-    if (error) {
-      event.target.checked = !isPrivate;
-      notify(error.message, true);
-      return;
-    }
+    if (error) throw error;
 
     currentProfile = data;
 
@@ -2058,37 +1955,35 @@ $("privateAccount")?.addEventListener(
         ? "Your account is now private 🔒"
         : "Your account is now public 💜"
     );
-  }
-);
 
-// =========================================
+  } catch (error) {
+    checkbox.checked = !isPrivate;
+    notify(error.message, true);
+  } finally {
+    checkbox.disabled = false;
+  }
+});
+
+// =====================================================
 // KEYBOARD SUPPORT
-// =========================================
+// =====================================================
 
 document.addEventListener("keydown", event => {
   if (event.key === "Escape") {
     closePublicProfile();
+
+    const viewer = $("storyViewer");
+    if (viewer) viewer.hidden = true;
   }
 });
 
-// =========================================
+// =====================================================
 // START LEAKA
-// =========================================
+// =====================================================
 
 checkSession().catch(error => {
   console.error("LEAKA startup error:", error);
-  notify("Something went wrong starting LEAKA.", true);
+  notify("Something went wrong starting LEAKA: " + error.message, true);
 });
-/* EMPTY PROFILE STATE FULL WIDTH */
 
-#profilePosts > .empty-state {
-  grid-column: 1 / -1;
-  width: 100%;
-  min-height: 260px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: 40px 20px;
-  text-align: center;
-}
+})();
