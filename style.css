@@ -550,54 +550,279 @@ main {
 }
 
 
+
 /* =====================================================
-   10. STORY VIEWER
+   10. LEAKA — WHATSAPP STYLE STORY VIEWER
 ===================================================== */
 
 #storyViewer {
   position: fixed;
   inset: 0;
   z-index: 99999;
-
-  display: grid;
-  place-items: center;
-
-  background: rgba(0, 0, 0, 0.96);
-  padding: 20px;
-}
-
-.story-viewer-content {
-  width: 100%;
-  max-width: 440px;
-  height: 85vh;
-
   display: flex;
   align-items: center;
   justify-content: center;
+  background: #050308;
+  overflow: hidden;
+  padding: 0;
+  touch-action: pan-y;
 }
 
-.story-viewer-content img,
-.story-viewer-content video {
+#storyViewer .story-viewer-content {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  max-width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 65px 0 100px;
+  z-index: 1;
+}
+
+#storyViewer .story-viewer-content img,
+#storyViewer .story-viewer-content video {
+  width: 100%;
+  height: 100%;
   max-width: 100%;
   max-height: 100%;
   object-fit: contain;
-  border-radius: 14px;
+  border-radius: 0;
 }
 
-.story-close {
+.story-viewer-top {
   position: absolute;
-  top: 20px;
-  right: 20px;
-
-  width: 43px;
-  height: 43px;
-  padding: 0;
-
-  border-radius: 50%;
-  background: #30243c;
-  font-size: 25px;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 5;
+  padding: 12px 12px 15px;
+  background: linear-gradient(#0009, transparent);
 }
 
+.story-progress-list {
+  display: flex;
+  gap: 4px;
+  width: 100%;
+  margin-bottom: 16px;
+}
+
+.story-progress {
+  flex: 1;
+  height: 3px;
+  border-radius: 10px;
+  background: #ffffff55;
+  overflow: hidden;
+}
+
+.story-progress-fill {
+  height: 100%;
+  width: 0%;
+  background: white;
+  border-radius: inherit;
+}
+
+.story-viewer-user {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: white;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.story-viewer-user img {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+#storyViewer .story-close {
+  position: absolute;
+  top: 52px;
+  right: 12px;
+  z-index: 10;
+  width: 38px;
+  height: 38px;
+  padding: 0;
+  border-radius: 50%;
+  background: #ffffff22;
+  font-size: 24px;
+}
+
+.story-tap-left,
+.story-tap-right {
+  position: absolute;
+  top: 75px;
+  bottom: 100px;
+  z-index: 2;
+  width: 30%;
+}
+
+.story-tap-left {
+  left: 0;
+}
+
+.story-tap-right {
+  right: 0;
+  width: 70%;
+}
+
+.story-pause-indicator {
+  position: absolute;
+  z-index: 15;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: #0009;
+  padding: 16px 22px;
+  border-radius: 50%;
+  font-size: 25px;
+  color: white;
+  display: none;
+}
+
+/* Viewer button */
+
+.story-owner-views {
+  position: absolute;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 11px 20px;
+  border-radius: 30px;
+  background: #21152f;
+  border: 1px solid #a66aff66;
+  color: white;
+  font-size: 13px;
+}
+
+/* Quick reactions */
+
+.story-reply-area {
+  position: absolute;
+  bottom: 20px;
+  left: 12px;
+  right: 12px;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.story-reactions {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.story-reactions button {
+  background: #ffffff20;
+  padding: 8px;
+  font-size: 23px;
+  border-radius: 25px;
+}
+
+.story-reply-input {
+  flex: 1;
+  min-width: 0;
+  border-radius: 25px;
+  background: #ffffff20;
+  border: 1px solid #ffffff55;
+  color: white;
+  padding: 11px 15px;
+}
+
+/* Viewers bottom sheet */
+
+.story-viewers-panel {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 30;
+  height: 65%;
+  background: #171123;
+  border-radius: 23px 23px 0 0;
+  border-top: 1px solid #a66aff55;
+  padding: 12px 18px 25px;
+  overflow-y: auto;
+  transform: translateY(100%);
+  transition: transform .3s ease;
+}
+
+.story-viewers-panel.open {
+  transform: translateY(0);
+}
+
+.story-viewers-handle {
+  width: 42px;
+  height: 4px;
+  border-radius: 10px;
+  background: #756481;
+  margin: 0 auto 18px;
+}
+
+.story-viewers-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 18px;
+}
+
+.story-viewers-heading h3 {
+  font-size: 16px;
+}
+
+.story-viewer-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.story-viewer-row img {
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+.story-viewer-row strong {
+  flex: 1;
+  font-size: 13px;
+}
+
+.story-viewer-like {
+  color: #ff5d91;
+  font-size: 19px;
+}
+
+.story-no-viewers {
+  text-align: center;
+  padding: 45px 15px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+@media (min-width: 700px) {
+  #storyViewer {
+    background: #08050d;
+  }
+
+  #storyViewer .story-viewer-content {
+    max-width: 440px;
+    left: 50%;
+    transform: translateX(-50%);
+  }
+}
 
 /* =====================================================
    11. CREATE POST
