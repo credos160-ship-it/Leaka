@@ -1,694 +1,745 @@
 
 /* =========================================
-   LEAKA — COMPLETE APP + SUPABASE
-   SOCIAL FEATURES EDITION 💜
+   LEAKA — COMPLETE SOCIAL APP
+   Supabase + Profiles + Following + Privacy
 ========================================= */
 
 const SUPABASE_URL = "https://kiwpmnvoqzrfwblnudjq.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable__oAt1RpObXR5PDqSG7yE1w_SkdZ0Hry";
 const BUCKET = "leaka-media";
-const REDIRECT_URL = "https://credos160-ship-it.github.io/Leaka/";
 
-/* =========================================
-   INITIALIZATION
-========================================= */
+const { createClient } = supabase;
+const db = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+let currentUser = null;
+let currentProfile = null;
+let selectedMedia = null;
+let activePublicUser = null;
+
+// =========================================
+// HELPERS
+// =========================================
 
 const $ = id => document.getElementById(id);
 
-function on(id, event, callback) {
-  const element = $(id);
-  if (element) element.addEventListener(event, callback);
+function escapeHTML(value = "") {
+  return String(value).replace(/[&<>"']/g, char => ({
+    "&": "&amp;",
+    "<": "&lt;",
+    ">": "&gt;",
+    '"': "&quot;",
+    "'": "&#039;"
+  })[char]);
 }
 
-function message(id, text) {
-  const element = $(id);
-  if (element) element.textContent = text;
+function avatarHTML(url, name = "U") {
+  return url
+    ? `<img src="${escapeHTML(url)}" alt="">`
+    : escapeHTML((name || "U").charAt(0).toUpperCase());
 }
 
-if (!window.supabase) {
-  document.body.insertAdjacentHTML(
-    "afterbegin",
-    '<p style="color:white;padding:20px">LEAKA could not load Supabase. Refresh the page.</p>'
-  );
-  throw new Error("Supabase library failed to load.");
+function profileName(profile) {
+  return profile?.display_name || profile?.username || "LEAKA User";
 }
 
-const supabaseClient = window.supabase.createClient(
-  SUPABASE_URL,
-  SUPABASE_ANON_KEY
-);
-
-let currentUser = null;
-let allPosts = [];
-let allLikes = [];
-let selectedMedia = null;
-let profilePostsTab = "posts";
-let handlingAuth = false;
-let searchTimeout;
-let currentPublicUser = null;
-
-let profile = {
-  name: "",
-  username: "",
-  bio: "Welcome to my LEAKA space 💜",
-  avatar: "",
-  cover: "",
-  isPrivate: false
-};
-
-/* =========================================
-   HELPERS
-========================================= */
-
-function initials(name) {
-  return (name || "U")
-    .trim()
-    .split(/\s+/)
-    .filter(Boolean)
-    .slice(0, 2)
-    .map(x => x[0].toUpperCase())
-    .join("");
+function username(profile) {
+  return profile?.username || "user";
 }
 
-function renderAvatar(element, name, image) {
-  if (!element) return;
+function notify(message, error = false) {
+  let box = $("leakaToast");
 
-  element.replaceChildren();
+  if (!box) {
+    box = document.createElement("div");
+    box.id = "leakaToast";
+    document.body.appendChild(box);
+  }
 
-  if (image) {
-    const img = document.createElement("img");
-    img.src = image;
-    img.alt = "Profile picture";
-    element.appendChild(img);
+  box.textContent = message;
+  box.style.cssText = `
+    position:fixed;
+    bottom:100px;
+    left:50%;
+    transform:translateX(-50%);
+    background:${error ? "#8e3152" : "#7139bd"};
+    color:white;
+    padding:13px 22px;
+    border-radius:30px;
+    z-index:99999;
+    box-shadow:0 8px 30px #0004;
+    font-size:13px;
+  `;
+
+  clearTimeout(window.leakaToastTimer);
+  window.leakaToastTimer = setTimeout(() => box.remove(), 2800);
+}
+
+// =========================================
+// STYLES FOR PUBLIC PROFILES
+// =========================================
+
+const profileStyles = document.createElement("style");
+
+profileStyles.textContent = `
+#publicProfileOverlay {
+  position:fixed;
+  inset:0;
+  z-index:9990;
+  background:rgba(15,10,23,.72);
+  backdrop-filter:blur(12px);
+  overflow-y:auto;
+  padding:25px 12px;
+}
+
+.public-profile-card {
+  width:min(100%,650px);
+  margin:15px auto;
+  background:#fdfaff;
+  color:#24172f;
+  border-radius:24px;
+  overflow:hidden;
+  box-shadow:0 25px 80px #0005;
+  animation:leakaProfileIn .25s ease;
+}
+
+@keyframes leakaProfileIn {
+  from {opacity:0;transform:translateY(18px)}
+  to {opacity:1;transform:translateY(0)}
+}
+
+.public-profile-cover {
+  height:190px;
+  position:relative;
+  background:linear-gradient(120deg,#b99af5,#8054c7,#e3b8ed);
+}
+
+.public-profile-cover img {
+  width:100%;
+  height:100%;
+  object-fit:cover;
+}
+
+.public-profile-close {
+  position:absolute;
+  top:14px;
+  right:14px;
+  width:38px;
+  height:38px;
+  border:0;
+  border-radius:50%;
+  background:#ffffffdd;
+  color:#493365;
+  font-size:23px;
+  cursor:pointer;
+}
+
+.public-profile-body {
+  padding:0 24px 25px;
+}
+
+.public-profile-top {
+  display:flex;
+  align-items:flex-end;
+  justify-content:space-between;
+  gap:12px;
+  margin-top:-48px;
+  position:relative;
+}
+
+.public-profile-avatar {
+  width:105px;
+  height:105px;
+  border:5px solid #fdfaff;
+  border-radius:50%;
+  background:linear-gradient(135deg,#bd9af4,#7749bf);
+  display:grid;
+  place-items:center;
+  overflow:hidden;
+  color:white;
+  font-size:32px;
+  font-weight:800;
+  flex-shrink:0;
+}
+
+.public-profile-avatar img {
+  width:100%;
+  height:100%;
+  object-fit:cover;
+}
+
+.public-profile-actions {
+  display:flex;
+  gap:9px;
+  padding-bottom:8px;
+}
+
+.public-follow-btn,
+.public-message-btn {
+  border:0;
+  border-radius:12px;
+  padding:11px 20px;
+  font-weight:700;
+  font-size:13px;
+  cursor:pointer;
+  transition:.2s;
+}
+
+.public-follow-btn {
+  background:linear-gradient(135deg,#9565e5,#713ac1);
+  color:white;
+  box-shadow:0 5px 15px #9565e544;
+}
+
+.public-follow-btn.following {
+  background:#eee7f7;
+  color:#603b91;
+  box-shadow:none;
+}
+
+.public-follow-btn:hover,
+.public-message-btn:hover {
+  transform:translateY(-2px);
+}
+
+.public-message-btn {
+  background:#f0e9f8;
+  color:#684397;
+}
+
+.public-profile-name {
+  margin-top:16px;
+  font-size:25px;
+  font-weight:800;
+  overflow-wrap:anywhere;
+}
+
+.public-profile-handle {
+  color:#947fa8;
+  font-size:13px;
+  margin-top:5px;
+}
+
+.public-profile-bio {
+  color:#574963;
+  font-size:14px;
+  line-height:1.7;
+  margin-top:15px;
+  overflow-wrap:anywhere;
+}
+
+.public-profile-stats {
+  display:flex;
+  gap:35px;
+  padding:22px 0;
+  margin-top:8px;
+  border-bottom:1px solid #eee5f5;
+}
+
+.public-profile-stats div {
+  display:flex;
+  flex-direction:column;
+  gap:4px;
+}
+
+.public-profile-stats strong {
+  font-size:20px;
+  color:#352344;
+}
+
+.public-profile-stats span {
+  font-size:11px;
+  color:#9b8ba8;
+}
+
+.public-profile-private {
+  padding:45px 15px;
+  text-align:center;
+  color:#846e99;
+}
+
+.public-profile-private strong {
+  display:block;
+  color:#49345e;
+  font-size:18px;
+  margin-bottom:8px;
+}
+
+.public-profile-posts {
+  display:grid;
+  grid-template-columns:repeat(3,minmax(0,1fr));
+  gap:5px;
+  padding-top:18px;
+}
+
+.public-profile-post {
+  aspect-ratio:1;
+  background:#eee7f6;
+  overflow:hidden;
+  cursor:pointer;
+}
+
+.public-profile-post img,
+.public-profile-post video {
+  width:100%;
+  height:100%;
+  object-fit:cover;
+}
+
+.public-profile-post-empty {
+  grid-column:1/-1;
+  padding:40px 10px;
+  text-align:center;
+  color:#9886a7;
+  font-size:13px;
+}
+
+.public-profile-tabs {
+  display:flex;
+  justify-content:space-around;
+  border-bottom:1px solid #eee5f5;
+  margin-top:12px;
+}
+
+.public-profile-tabs button {
+  flex:1;
+  padding:14px;
+  background:none;
+  border:0;
+  color:#9b8ba8;
+  font-weight:600;
+  cursor:pointer;
+}
+
+.public-profile-tabs button.selected {
+  color:#824ac4;
+  border-bottom:2px solid #824ac4;
+}
+
+.request-list-item {
+  display:flex;
+  align-items:center;
+  gap:12px;
+  padding:13px 0;
+  border-bottom:1px solid #eee5f5;
+}
+
+.request-list-item img,
+.request-list-item .request-avatar {
+  width:43px;
+  height:43px;
+  border-radius:50%;
+  object-fit:cover;
+  background:#a17ad4;
+}
+
+.request-list-item .request-info {
+  flex:1;
+  min-width:0;
+}
+
+.request-list-item small {
+  display:block;
+  color:#9584a3;
+  margin-top:4px;
+}
+
+.request-list-item button {
+  border:0;
+  border-radius:9px;
+  padding:9px 12px;
+  background:#8050c7;
+  color:white;
+  cursor:pointer;
+  margin-left:4px;
+}
+
+.request-list-item button.decline {
+  background:#eee7f5;
+  color:#654582;
+}
+
+@media(max-width:430px) {
+  .public-profile-cover {height:155px}
+  .public-profile-body {padding:0 16px 20px}
+  .public-profile-avatar {width:88px;height:88px}
+  .public-profile-name {font-size:22px}
+  .public-profile-stats {gap:25px}
+  .public-follow-btn,.public-message-btn {padding:10px 13px}
+}
+`;
+
+document.head.appendChild(profileStyles);
+
+// =========================================
+// AUTHENTICATION
+// =========================================
+
+async function getProfile(userId) {
+  const { data, error } = await db
+    .from("profiles")
+    .select("*")
+    .eq("id", userId)
+    .maybeSingle();
+
+  if (error) throw error;
+  return data;
+}
+
+async function ensureProfile(user) {
+  let profile = await getProfile(user.id);
+
+  if (!profile) {
+    const newProfile = {
+      id: user.id,
+      username: user.email.split("@")[0].toLowerCase().replace(/[^a-z0-9_]/g, ""),
+      display_name: user.email.split("@")[0],
+      bio: "Welcome to my LEAKA space 💜"
+    };
+
+    const { error } = await db
+      .from("profiles")
+      .upsert(newProfile);
+
+    if (error) throw error;
+    profile = await getProfile(user.id);
+  }
+
+  return profile;
+}
+
+async function startApp(user) {
+  currentUser = user;
+
+  try {
+    currentProfile = await ensureProfile(user);
+  } catch (error) {
+    console.error("Profile error:", error);
+    notify("Could not load your profile.", true);
+  }
+
+  $("auth").hidden = true;
+  $("appContent").hidden = false;
+
+  await updateMyProfileUI();
+  await loadPosts();
+  await loadSearch();
+  await loadAccountDetails();
+}
+
+async function checkSession() {
+  const { data, error } = await db.auth.getSession();
+
+  if (error) console.error(error);
+
+  if (data.session?.user) {
+    await startApp(data.session.user);
   } else {
-    element.textContent = initials(name);
+    $("auth").hidden = false;
+    $("appContent").hidden = true;
   }
 }
 
-function makeButton(text, className, callback) {
-  const button = document.createElement("button");
-  button.type = "button";
-  button.textContent = text;
-  button.className = className || "action-btn";
-  button.addEventListener("click", callback);
-  return button;
-}
+$("signupBtn")?.addEventListener("click", async () => {
+  const email = $("email").value.trim();
+  const password = $("password").value;
 
-function showPage(id, scrollTarget) {
-  const target = $(id);
-  if (!target) return;
+  if (!email || !password) {
+    $("authMessage").textContent = "Enter your email and password.";
+    return;
+  }
 
-  document.querySelectorAll(".page").forEach(page => {
-    page.hidden = page.id !== id;
+  if (password.length < 6) {
+    $("authMessage").textContent = "Password must be at least 6 characters.";
+    return;
+  }
+
+  $("authMessage").textContent = "Creating your account...";
+
+  const { error } = await db.auth.signUp({
+    email,
+    password,
+    options: {
+      emailRedirectTo: "https://credos160-ship-it.github.io/Leaka/"
+    }
   });
 
-  document.querySelectorAll(".nav-item").forEach(item => {
-    item.classList.toggle("active", item.dataset.page === id);
+  if (error) {
+    $("authMessage").textContent = error.message;
+  } else {
+    $("authMessage").textContent =
+      "Account created! Check your email if confirmation is enabled.";
+  }
+});
+
+$("loginBtn")?.addEventListener("click", async () => {
+  const email = $("email").value.trim();
+  const password = $("password").value;
+
+  if (!email || !password) {
+    $("authMessage").textContent = "Enter your email and password.";
+    return;
+  }
+
+  $("authMessage").textContent = "Logging in...";
+
+  const { data, error } = await db.auth.signInWithPassword({
+    email,
+    password
+  });
+
+  if (error) {
+    $("authMessage").textContent = error.message;
+  } else {
+    await startApp(data.user);
+  }
+});
+
+async function logout() {
+  await db.auth.signOut();
+  currentUser = null;
+  currentProfile = null;
+  location.reload();
+}
+
+$("logoutBtn")?.addEventListener("click", logout);
+$("settingsLogoutBtn")?.addEventListener("click", logout);
+
+db.auth.onAuthStateChange((event, session) => {
+  if (event === "SIGNED_OUT") {
+    currentUser = null;
+    $("auth").hidden = false;
+    $("appContent").hidden = true;
+  }
+});
+
+// =========================================
+// NAVIGATION
+// =========================================
+
+function showPage(pageId) {
+  document.querySelectorAll(".page").forEach(page => {
+    const active = page.id === pageId;
+    page.hidden = !active;
+    page.classList.toggle("active", active);
+  });
+
+  document.querySelectorAll(".nav-item").forEach(button => {
+    button.classList.toggle(
+      "active",
+      button.dataset.page === pageId
+    );
   });
 
   window.scrollTo({ top: 0, behavior: "smooth" });
 
-  if (scrollTarget) {
+  if (pageId === "profile") updateMyProfileUI();
+  if (pageId === "settings") loadAccountDetails();
+}
+
+document.addEventListener("click", event => {
+  const button = event.target.closest("[data-page]");
+
+  if (!button) return;
+
+  const page = button.dataset.page;
+  showPage(page);
+
+  if (button.dataset.scroll) {
     setTimeout(() => {
-      $(scrollTarget)?.scrollIntoView({
-        behavior: "smooth",
-        block: "start"
+      $(button.dataset.scroll)?.scrollIntoView({
+        behavior: "smooth"
       });
-    }, 150);
-  }
-
-  if (id === "profile") renderProfilePosts();
-}
-
-/* =========================================
-   SUPABASE PROFILE SYSTEM
-========================================= */
-
-async function loadProfile() {
-  if (!currentUser) return;
-
-  const key = "leaka_profile_" + currentUser.id;
-
-  let saved = {};
-
-  try {
-    saved = JSON.parse(localStorage.getItem(key) || "{}");
-  } catch (error) {
-    console.warn("Local profile loading error:", error);
-  }
-
-  const { data, error } = await supabaseClient
-    .from("profiles")
-    .select("*")
-    .eq("id", currentUser.id)
-    .maybeSingle();
-
-  if (error) {
-    console.warn("Supabase profile loading:", error.message);
-  }
-
-  const metadata = currentUser.user_metadata || {};
-
-  profile = {
-    name:
-      data?.display_name ||
-      saved.name ||
-      metadata.display_name ||
-      currentUser.email?.split("@")[0] ||
-      "User",
-
-    username:
-      data?.username ||
-      saved.username ||
-      metadata.username ||
-      currentUser.email?.split("@")[0] ||
-      "user",
-
-    bio:
-      data?.bio ??
-      saved.bio ??
-      "Welcome to my LEAKA space 💜",
-
-    avatar:
-      data?.avatar_url ||
-      saved.avatar ||
-      "",
-
-    cover: saved.cover || "",
-
-    isPrivate: Boolean(data?.is_private)
-  };
-
-  // Create the profile row if it doesn't exist.
-  if (!data) {
-    const { error: insertError } = await supabaseClient
-      .from("profiles")
-      .upsert({
-        id: currentUser.id,
-        username: profile.username,
-        display_name: profile.name,
-        bio: profile.bio,
-        avatar_url: profile.avatar,
-        is_private: profile.isPrivate
-      });
-
-    if (insertError) {
-      console.warn("Profile creation:", insertError.message);
-    }
-  }
-
-  renderProfile();
-}
-
-function renderProfile() {
-  if (!currentUser) return;
-
-  const name = profile.name || "Your name";
-
-  if ($("profileName")) $("profileName").textContent = name;
-
-  if ($("profileEmail")) {
-    $("profileEmail").textContent = "@" + profile.username;
-  }
-
-  if ($("profileBio")) {
-    $("profileBio").textContent = profile.bio;
-  }
-
-  if ($("displayName")) {
-    $("displayName").value = profile.name;
-  }
-
-  if ($("bioInput")) {
-    $("bioInput").value = profile.bio;
-  }
-
-  if ($("accountEmail")) {
-    $("accountEmail").textContent = currentUser.email || "";
-  }
-
-  if ($("accountDisplayName")) {
-    $("accountDisplayName").textContent = name;
-  }
-
-  renderAvatar($("profileAvatar"), name, profile.avatar);
-  renderAvatar($("editAvatar"), name, profile.avatar);
-  renderAvatar($("profileBtn"), name, profile.avatar);
-
-  const cover = $("profileCover");
-  const coverImage = $("profileCoverImage");
-  const editPreview = $("editCoverPreview");
-
-  if (profile.cover) {
-    if (coverImage) {
-      coverImage.src = profile.cover;
-      coverImage.hidden = false;
-    }
-
-    if (cover) {
-      cover.style.backgroundImage = `url("${profile.cover}")`;
-      cover.style.backgroundSize = "cover";
-      cover.style.backgroundPosition = "center";
-    }
-
-    if (editPreview) {
-      editPreview.style.backgroundImage = `url("${profile.cover}")`;
-      editPreview.style.backgroundSize = "cover";
-      editPreview.style.backgroundPosition = "center";
-      editPreview.classList.add("has-cover");
-      editPreview.textContent = "";
-    }
-  } else {
-    if (coverImage) coverImage.hidden = true;
-    if (cover) cover.style.backgroundImage = "";
-
-    if (editPreview) {
-      editPreview.style.backgroundImage = "";
-      editPreview.classList.remove("has-cover");
-      editPreview.textContent = "Your LEAKA cover";
-    }
-  }
-
-  renderPrivacyControl();
-  loadMyFollowCounts();
-}
-
-function saveLocalProfile() {
-  localStorage.setItem(
-    "leaka_profile_" + currentUser.id,
-    JSON.stringify(profile)
-  );
-}
-
-on("saveProfileBtn", "click", async () => {
-  if (!currentUser) return;
-
-  const name = $("displayName")?.value.trim();
-
-  if (!name) {
-    message("profileMessage", "Please enter a display name.");
-    return;
-  }
-
-  profile.name = name;
-  profile.bio = $("bioInput")?.value.trim() || "";
-
-  const { error } = await supabaseClient
-    .from("profiles")
-    .upsert({
-      id: currentUser.id,
-      username: profile.username,
-      display_name: profile.name,
-      bio: profile.bio,
-      avatar_url: profile.avatar,
-      is_private: profile.isPrivate
-    });
-
-  if (error) {
-    message("profileMessage", "Profile save failed: " + error.message);
-    return;
-  }
-
-  try {
-    saveLocalProfile();
-    renderProfile();
-    message("profileMessage", "Profile saved successfully! 💜");
-    showPage("profile");
-  } catch (error) {
-    message("profileMessage", "Local save error: " + error.message);
+    }, 200);
   }
 });
 
-/* =========================================
-   PRIVACY SETTINGS
-========================================= */
+$("profileBtn")?.addEventListener("click", () => showPage("profile"));
+$("settingsGear")?.addEventListener("click", () => showPage("settings"));
 
-function renderPrivacyControl() {
-  const page = $("profile");
-  if (!page) return;
+// =========================================
+// MY PROFILE
+// =========================================
 
-  let container = $("privacyControl");
+function localProfile() {
+  if (!currentUser) return {};
 
-  if (!container) {
-    container = document.createElement("div");
-    container.id = "privacyControl";
-    container.className = "auth-card";
-    container.style.padding = "15px";
-    page.appendChild(container);
+  try {
+    return JSON.parse(
+      localStorage.getItem("leaka_profile_" + currentUser.id) || "{}"
+    );
+  } catch {
+    return {};
   }
-
-  container.replaceChildren();
-
-  const heading = document.createElement("h3");
-  heading.textContent = "Account privacy 🔒";
-
-  const description = document.createElement("p");
-  description.textContent = profile.isPrivate
-    ? "Your account is private. People must request to follow you."
-    : "Your account is public. Anyone can follow you.";
-
-  const toggle = makeButton(
-    profile.isPrivate ? "Make account public" : "Make account private",
-    "action-btn",
-    togglePrivacy
-  );
-
-  container.append(heading, description, toggle);
 }
 
-async function togglePrivacy() {
+async function updateMyProfileUI() {
   if (!currentUser) return;
 
-  const newValue = !profile.isPrivate;
+  const profile = currentProfile || {};
+  const local = localProfile();
 
-  const { error } = await supabaseClient
-    .from("profiles")
-    .update({ is_private: newValue })
-    .eq("id", currentUser.id);
+  const name = profile.display_name || local.name || currentUser.email.split("@")[0];
+  const avatar = profile.avatar_url || local.avatar || "";
+  const cover = local.cover || "";
 
-  if (error) {
-    alert("Privacy update failed: " + error.message);
-    return;
+  $("profileName").textContent = name;
+  $("profileEmail").textContent = "@" + username(profile);
+  $("profileBio").textContent = profile.bio || local.bio || "Welcome to my LEAKA space 💜";
+
+  $("profileAvatar").innerHTML = avatarHTML(avatar, name);
+  $("editAvatar").innerHTML = avatarHTML(avatar, name);
+
+  const topAvatar = $("profileBtn");
+  if (topAvatar) topAvatar.innerHTML = avatarHTML(avatar, name);
+
+  if (cover) {
+    $("profileCoverImage").src = cover;
+    $("profileCoverImage").hidden = false;
+  } else {
+    $("profileCoverImage").hidden = true;
   }
 
-  profile.isPrivate = newValue;
+  $("displayName").value = name;
+  $("bioInput").value = profile.bio || local.bio || "";
 
-  saveLocalProfile();
-  renderPrivacyControl();
-
-  alert(newValue
-    ? "Your account is now private 🔒"
-    : "Your account is now public 💜"
-  );
+  await loadMyCounts();
+  await loadMyPosts();
 }
 
-/* =========================================
-   STORAGE / MEDIA UPLOAD
-========================================= */
+async function loadAccountDetails() {
+  if (!currentUser) return;
+
+  $("accountEmail").textContent = currentUser.email;
+
+  $("accountDisplayName").textContent =
+    currentProfile?.display_name || "Not set";
+}
+
+$("avatarInput")?.addEventListener("change", async event => {
+  const file = event.target.files[0];
+  if (!file) return;
+
+  const url = await uploadMedia(file, "avatars");
+
+  if (!url) return;
+
+  const { error } = await db
+    .from("profiles")
+    .update({ avatar_url: url })
+    .eq("id", currentUser.id);
+
+  if (error) return notify(error.message, true);
+
+  currentProfile.avatar_url = url;
+  await updateMyProfileUI();
+  notify("Profile photo updated 💜");
+});
+
+$("coverInput")?.addEventListener("change", async event => {
+  const file = event.target.files[0];
+  if (!file) return;
+
+  const url = await uploadMedia(file, "covers");
+  if (!url) return;
+
+  const local = localProfile();
+  local.cover = url;
+
+  localStorage.setItem(
+    "leaka_profile_" + currentUser.id,
+    JSON.stringify(local)
+  );
+
+  $("editCoverPreview").innerHTML =
+    `<img src="${escapeHTML(url)}" alt="">`;
+
+  await updateMyProfileUI();
+  notify("Cover photo updated!");
+});
+
+$("saveProfileBtn")?.addEventListener("click", async () => {
+  const name = $("displayName").value.trim();
+  const bio = $("bioInput").value.trim();
+
+  if (!name) return notify("Enter your display name.", true);
+
+  const { data, error } = await db
+    .from("profiles")
+    .update({
+      display_name: name,
+      bio
+    })
+    .eq("id", currentUser.id)
+    .select()
+    .single();
+
+  if (error) return notify(error.message, true);
+
+  currentProfile = data;
+  await updateMyProfileUI();
+
+  $("profileMessage").textContent = "Profile saved successfully 💜";
+  notify("Profile updated!");
+});
+
+// =========================================
+// MEDIA UPLOAD
+// =========================================
 
 async function uploadMedia(file, folder = "posts") {
-  if (!currentUser) throw new Error("Please log in first.");
+  if (!currentUser) return null;
 
   const extension = file.name.split(".").pop();
+  const path = `${folder}/${currentUser.id}/${Date.now()}.${extension}`;
 
-  const path =
-    currentUser.id + "/" + folder + "/" +
-    Date.now() + "." + extension;
-
-  const { error } = await supabaseClient.storage
+  const { error } = await db.storage
     .from(BUCKET)
     .upload(path, file, {
-      contentType: file.type,
-      upsert: true
+      upsert: true,
+      contentType: file.type
     });
 
-  if (error) throw error;
+  if (error) {
+    console.error(error);
+    notify("Upload failed: " + error.message, true);
+    return null;
+  }
 
-  const { data } = supabaseClient.storage
+  const { data } = db.storage
     .from(BUCKET)
     .getPublicUrl(path);
 
   return data.publicUrl;
 }
 
-/* =========================================
-   AUTHENTICATION
-========================================= */
+// =========================================
+// POSTS
+// =========================================
 
-on("signupBtn", "click", async () => {
-  const email = $("email")?.value.trim();
-  const password = $("password")?.value;
+$("mediaInput")?.addEventListener("change", event => {
+  selectedMedia = event.target.files[0] || null;
 
-  if (!email || !password || password.length < 6) {
-    message("authMessage", "Enter a valid email and password (6+ characters).");
-    return;
-  }
+  if (!selectedMedia) return;
 
-  const btn = $("signupBtn");
-  btn.disabled = true;
-  message("authMessage", "Creating account...");
+  const url = URL.createObjectURL(selectedMedia);
+  const isVideo = selectedMedia.type.startsWith("video/");
 
-  try {
-    const { data, error } = await supabaseClient.auth.signUp({
-      email,
-      password,
-      options: {
-        emailRedirectTo: REDIRECT_URL
-      }
-    });
-
-    if (error) throw error;
-
-    message(
-      "authMessage",
-      data.session
-        ? "Welcome to LEAKA! 💜"
-        : "Account created! Check your email to confirm."
-    );
-
-  } catch (error) {
-    message("authMessage", error.message);
-  } finally {
-    btn.disabled = false;
-  }
+  $("preview").innerHTML = isVideo
+    ? `<video src="${url}" controls></video>`
+    : `<img src="${url}" alt="Preview">`;
 });
 
-on("loginBtn", "click", async () => {
-  const email = $("email")?.value.trim();
-  const password = $("password")?.value;
+$("postBtn")?.addEventListener("click", async () => {
+  if (!currentUser) return;
 
-  if (!email || !password) {
-    message("authMessage", "Enter your email and password.");
-    return;
-  }
-
-  const btn = $("loginBtn");
-  btn.disabled = true;
-  message("authMessage", "Logging in...");
-
-  try {
-    const { error } = await supabaseClient.auth.signInWithPassword({
-      email,
-      password
-    });
-
-    if (error) throw error;
-
-    message("authMessage", "Welcome back! 💜");
-
-  } catch (error) {
-    message("authMessage", error.message);
-  } finally {
-    btn.disabled = false;
-  }
-});
-
-async function logout() {
-  const { error } = await supabaseClient.auth.signOut();
-
-  if (error) {
-    alert("Logout failed: " + error.message);
-  }
-}
-
-on("settingsLogoutBtn", "click", () => {
-  if (confirm("Are you sure you want to log out?")) logout();
-});
-
-on("logoutBtn", "click", () => {
-  if (confirm("Are you sure you want to log out?")) logout();
-});
-
-/* =========================================
-   AUTH STATE
-========================================= */
-
-async function updateAuthUI(session) {
-  if (handlingAuth) return;
-
-  handlingAuth = true;
-
-  try {
-    currentUser = session?.user || null;
-
-    if ($("auth")) $("auth").hidden = !!currentUser;
-    if ($("appContent")) $("appContent").hidden = !currentUser;
-
-    if ($("signupBtn")) $("signupBtn").hidden = !!currentUser;
-    if ($("loginBtn")) $("loginBtn").hidden = !!currentUser;
-    if ($("logoutBtn")) $("logoutBtn").hidden = !currentUser;
-
-    if (currentUser) {
-      await loadProfile();
-      showPage("home");
-      await loadPosts();
-      await loadNotifications();
-      await loadIncomingRequests();
-    } else {
-      allPosts = [];
-      allLikes = [];
-      $("posts")?.replaceChildren();
-      $("profilePosts")?.replaceChildren();
-    }
-
-  } finally {
-    handlingAuth = false;
-  }
-}
-
-supabaseClient.auth.onAuthStateChange((event, session) => {
-  if (event === "INITIAL_SESSION") return;
-  setTimeout(() => updateAuthUI(session), 0);
-});
-
-async function initializeApp() {
-  try {
-    const { data, error } = await supabaseClient.auth.getSession();
-
-    if (error) throw error;
-
-    await updateAuthUI(data.session);
-
-  } catch (error) {
-    console.error("LEAKA initialization:", error);
-    message("authMessage", "Could not start LEAKA: " + error.message);
-  }
-}
-
-/* =========================================
-   NAVIGATION
-========================================= */
-
-document.querySelectorAll("[data-page]").forEach(button => {
-  button.addEventListener("click", event => {
-    event.preventDefault();
-    showPage(button.dataset.page, button.dataset.scroll);
-  });
-});
-
-on("profileBtn", "click", () => showPage("profile"));
-
-/* =========================================
-   AVATAR UPLOAD
-========================================= */
-
-on("avatarInput", "change", async event => {
-  const file = event.target.files[0];
-  if (!file) return;
-
-  if (!file.type.startsWith("image/") || file.size > 2 * 1024 * 1024) {
-    alert("Choose an image smaller than 2MB.");
-    event.target.value = "";
-    return;
-  }
-
-  try {
-    const url = await uploadMedia(file, "avatars");
-
-    profile.avatar = url;
-
-    const { error } = await supabaseClient
-      .from("profiles")
-      .update({ avatar_url: url })
-      .eq("id", currentUser.id);
-
-    if (error) throw error;
-
-    saveLocalProfile();
-    renderProfile();
-    message("profileMessage", "Profile picture updated! 💜");
-
-  } catch (error) {
-    alert("Avatar upload failed: " + error.message);
-  }
-
-  event.target.value = "";
-});
-
-/* =========================================
-   COVER UPLOAD
-========================================= */
-
-on("coverInput", "change", async event => {
-  const file = event.target.files[0];
-  if (!file) return;
-
-  if (!file.type.startsWith("image/") || file.size > 2 * 1024 * 1024) {
-    alert("Choose an image smaller than 2MB.");
-    event.target.value = "";
-    return;
-  }
-
-  message("profileMessage", "Uploading your cover...");
-
-  try {
-    profile.cover = await uploadMedia(file, "covers");
-    saveLocalProfile();
-    renderProfile();
-    message("profileMessage", "Cover photo updated! 💜");
-  } catch (error) {
-    alert("Cover upload failed: " + error.message);
-  }
-
-  event.target.value = "";
-});
-
-/* =========================================
-   POST MEDIA PREVIEW
-========================================= */
-
-on("mediaInput", "change", () => {
-  const file = $("mediaInput")?.files[0];
-
-  $("preview")?.replaceChildren();
-  selectedMedia = null;
-
-  if (!file) return;
-
-  if (!file.type.startsWith("image/") &&
-      !file.type.startsWith("video/")) {
-    alert("Choose an image or video.");
-    return;
-  }
-
-  if (file.size > 25 * 1024 * 1024) {
-    alert("Maximum upload size is 25MB.");
-    $("mediaInput").value = "";
-    return;
-  }
-
-  selectedMedia = file;
-
-  const element = document.createElement(
-    file.type.startsWith("video/") ? "video" : "img"
-  );
-
-  element.src = URL.createObjectURL(file);
-  element.style.width = "100%";
-
-  if (element.tagName === "VIDEO") {
-    element.controls = true;
-  }
-
-  $("preview")?.appendChild(element);
-});
-
-/* =========================================
-   CREATE POST
-========================================= */
-
-on("postBtn", "click", async () => {
-  if (!currentUser) return alert("Please log in first.");
-
-  const caption = $("caption")?.value.trim() || "";
+  const caption = $("caption").value.trim();
 
   if (!caption && !selectedMedia) {
-    return alert("Write something or upload media first!");
+    return notify("Write something or add media.", true);
   }
 
-  const btn = $("postBtn");
-  btn.disabled = true;
-  btn.textContent = "Publishing...";
+  $("postBtn").disabled = true;
+  $("postBtn").textContent = "Publishing...";
 
   try {
     let mediaUrl = null;
@@ -696,12 +747,13 @@ on("postBtn", "click", async () => {
 
     if (selectedMedia) {
       mediaUrl = await uploadMedia(selectedMedia);
+      if (!mediaUrl) return;
       mediaType = selectedMedia.type.startsWith("video/")
         ? "video"
         : "image";
     }
 
-    const { error } = await supabaseClient.from("posts").insert({
+    const { error } = await db.from("posts").insert({
       user_id: currentUser.id,
       caption,
       media_url: mediaUrl,
@@ -712,329 +764,820 @@ on("postBtn", "click", async () => {
 
     $("caption").value = "";
     $("mediaInput").value = "";
-    $("preview")?.replaceChildren();
+    $("preview").innerHTML = "";
     selectedMedia = null;
 
-    alert("Post published! 💜");
+    notify("Your post is live! ✨");
     await loadPosts();
+    await loadMyPosts();
 
   } catch (error) {
-    alert("Publishing failed: " + error.message);
+    notify(error.message, true);
   } finally {
-    btn.disabled = false;
-    btn.textContent = "Publish ↗";
+    $("postBtn").disabled = false;
+    $("postBtn").textContent = "Publish ↗";
   }
 });
 
-/* =========================================
-   LOAD POSTS AND LIKES
-========================================= */
-
-async function loadLikes() {
-  if (!currentUser) return;
-
-  const { data, error } = await supabaseClient
-    .from("likes")
-    .select("user_id, post_id");
-
-  if (error) {
-    console.warn("Likes loading:", error.message);
-    allLikes = [];
-    return;
-  }
-
-  allLikes = data || [];
-}
-
 async function loadPosts() {
-  if (!currentUser) return;
-
-  if ($("posts")) {
-    $("posts").textContent = "Loading your feed...";
-  }
-
-  try {
-    const { data, error } = await supabaseClient
-      .from("posts")
-      .select("*")
-      .order("created_at", { ascending: false });
-
-    if (error) throw error;
-
-    allPosts = data || [];
-
-    await loadLikes();
-
-    renderPosts();
-    renderProfilePosts();
-
-  } catch (error) {
-    console.error("Post loading:", error);
-    if ($("posts")) {
-      $("posts").textContent = "Could not load posts: " + error.message;
-    }
-  }
-}
-
-/* =========================================
-   LIKES
-========================================= */
-
-async function toggleLike(postId) {
-  if (!currentUser) return;
-
-  const existing = allLikes.find(
-    like =>
-      like.post_id === postId &&
-      like.user_id === currentUser.id
-  );
-
-  try {
-    const result = existing
-      ? await supabaseClient
-          .from("likes")
-          .delete()
-          .eq("post_id", postId)
-          .eq("user_id", currentUser.id)
-      : await supabaseClient
-          .from("likes")
-          .insert({
-            post_id: postId,
-            user_id: currentUser.id
-          });
-
-    if (result.error) throw result.error;
-
-    await loadLikes();
-    renderPosts();
-    renderProfilePosts();
-
-  } catch (error) {
-    alert("Like failed: " + error.message);
-  }
-}
-
-/* =========================================
-   POST ELEMENT
-========================================= */
-
-function createPostElement(post) {
-  const article = document.createElement("article");
-  article.className = "post-card";
-
-  const owner = post.user_id === currentUser?.id;
-  const name = owner ? (profile.name || "You") : "LEAKA member";
-
-  const header = document.createElement("div");
-  header.className = "post-header";
-
-  const avatar = document.createElement("div");
-  avatar.className = "post-avatar";
-  renderAvatar(avatar, name, owner ? profile.avatar : "");
-
-  const info = document.createElement("div");
-
-  const username = document.createElement("div");
-  username.className = "post-user";
-  username.textContent = name;
-
-  const time = document.createElement("div");
-  time.className = "post-time";
-  time.textContent = post.created_at
-    ? new Date(post.created_at).toLocaleString()
-    : "";
-
-  info.append(username, time);
-  header.append(avatar, info);
-  article.append(header);
-
-  if (post.caption) {
-    const caption = document.createElement("p");
-    caption.className = "post-caption";
-    caption.textContent = post.caption;
-    article.append(caption);
-  }
-
-  if (post.media_url) {
-    const media = document.createElement(
-      post.media_type === "video" ? "video" : "img"
-    );
-
-    media.src = post.media_url;
-    media.className = "post-media";
-
-    if (post.media_type === "video") {
-      media.controls = true;
-      media.playsInline = true;
-    } else {
-      media.loading = "lazy";
-    }
-
-    article.append(media);
-  }
-
-  const postLikes = allLikes.filter(
-    like => like.post_id === post.id
-  );
-
-  const liked = postLikes.some(
-    like => like.user_id === currentUser?.id
-  );
-
-  const likeBtn = makeButton(
-    `${liked ? "❤️" : "🤍"} ${postLikes.length} Likes`,
-    "action-btn",
-    () => toggleLike(post.id)
-  );
-
-  article.append(likeBtn);
-
-  if (owner) {
-    const actions = document.createElement("div");
-    actions.className = "post-actions";
-
-    actions.append(
-      makeButton("✎ Edit", "action-btn", () => editPost(post)),
-      makeButton("🗑 Delete", "action-btn", () => deletePost(post))
-    );
-
-    article.append(actions);
-  }
-
-  return article;
-}
-
-/* =========================================
-   RENDER POSTS
-========================================= */
-
-function renderPosts() {
   const container = $("posts");
   if (!container || !currentUser) return;
 
-  container.replaceChildren();
+  const { data, error } = await db
+    .from("posts")
+    .select("*")
+    .order("created_at", { ascending: false });
 
-  if (!allPosts.length) {
+  if (error) {
+    console.error(error);
+    return;
+  }
+
+  if (!data.length) {
     container.innerHTML = `
       <div class="empty-state">
         <div>✦</div>
         <h3>Your story starts here</h3>
         <p>Be the first to share something.</p>
-      </div>
-    `;
-  } else {
-    allPosts.forEach(post => {
-      container.appendChild(createPostElement(post));
-    });
-  }
-
-  message(
-    "postCount",
-    String(allPosts.filter(p => p.user_id === currentUser.id).length)
-  );
-}
-
-/* =========================================
-   EDIT POST
-========================================= */
-
-async function editPost(post) {
-  if (post.user_id !== currentUser.id) return;
-
-  const caption = prompt("Edit your caption:", post.caption || "");
-  if (caption === null) return;
-
-  try {
-    const { error } = await supabaseClient
-      .from("posts")
-      .update({ caption: caption.trim() })
-      .eq("id", post.id)
-      .eq("user_id", currentUser.id);
-
-    if (error) throw error;
-
-    await loadPosts();
-    alert("Post updated! 💜");
-
-  } catch (error) {
-    alert("Edit failed: " + error.message);
-  }
-}
-
-/* =========================================
-   DELETE POST
-========================================= */
-
-async function deletePost(post) {
-  if (post.user_id !== currentUser.id) return;
-
-  if (!confirm("Permanently delete this post?")) return;
-
-  try {
-    const { error } = await supabaseClient
-      .from("posts")
-      .delete()
-      .eq("id", post.id)
-      .eq("user_id", currentUser.id);
-
-    if (error) throw error;
-
-    await loadPosts();
-    alert("Post deleted.");
-
-  } catch (error) {
-    alert("Delete failed: " + error.message);
-  }
-}
-
-/* =========================================
-   PROFILE POSTS
-========================================= */
-
-function renderProfilePosts() {
-  if (!currentUser) return;
-
-  const container = $("profilePosts");
-  if (!container) return;
-
-  container.replaceChildren();
-
-  let own = allPosts.filter(
-    post => post.user_id === currentUser.id
-  );
-
-  if ($("postCount")) {
-    $("postCount").textContent = own.length;
-  }
-
-  if (profilePostsTab === "videos") {
-    own = own.filter(post => post.media_type === "video");
-  }
-
-  if (profilePostsTab === "liked") {
-    own = allPosts.filter(post =>
-      allLikes.some(
-        like =>
-          like.post_id === post.id &&
-          like.user_id === currentUser.id
-      )
-    );
-  }
-
-  if (!own.length) {
-    container.innerHTML = `
-      <div class="empty-state">
-        <h3>No posts yet</h3>
-        <p>Your shared moments will appear here.</p>
-      </div>
-    `;
+      </div>`;
     return;
   }
 
-  own.forEach(post => {
-    container.appendChild(createPostElement(post));
+  container.innerHTML = "";
+
+  for (const post of data) {
+    const profile = await getProfile(post.user_id).catch(() => null);
+
+    const { data: likes } = await db
+      .from("likes")
+      .select("user_id")
+      .eq("post_id", post.id);
+
+    const liked = likes?.some(like => like.user_id === currentUser.id);
+    const count = likes?.length || 0;
+
+    const card = document.createElement("article");
+    card.className = "post-card";
+
+    card.innerHTML = `
+      <div class="post-header">
+        <div class="post-avatar">
+          ${avatarHTML(profile?.avatar_url, profileName(profile))}
+        </div>
+        <div>
+          <div class="post-user">${escapeHTML(profileName(profile))}</div>
+          <div class="post-time">@${escapeHTML(username(profile))}</div>
+        </div>
+      </div>
+
+      ${post.caption ? `<p class="post-caption">${escapeHTML(post.caption)}</p>` : ""}
+
+      ${post.media_url ? (
+        post.media_type === "video"
+          ? `<video class="post-media" src="${escapeHTML(post.media_url)}" controls playsinline></video>`
+          : `<img class="post-media" src="${escapeHTML(post.media_url)}" alt="Post">`
+      ) : ""}
+
+      <div class="post-actions">
+        <button class="action-btn ${liked ? "liked" : ""}" data-like="${post.id}">
+          ${liked ? "♥" : "♡"} ${count} Likes
+        </button>
+        <button class="action-btn" data-comment-focus="${post.id}">
+          ♧ Comment
+        </button>
+        ${post.user_id === currentUser.id
+          ? `<button class="action-btn" data-delete-post="${post.id}">Delete</button>`
+          : ""}
+      </div>
+
+      <div class="comment-area">
+        <input id="comment-${post.id}" placeholder="Write a comment...">
+        <button data-comment="${post.id}">Send</button>
+      </div>
+      <div class="comments" id="comments-${post.id}"></div>
+    `;
+
+    container.appendChild(card);
+    loadComments(post.id);
+  }
+}
+
+// =========================================
+// LIKES
+// =========================================
+
+document.addEventListener("click", async event => {
+  const button = event.target.closest("[data-like]");
+  if (!button || !currentUser) return;
+
+  const postId = button.dataset.like;
+
+  const { data: existing } = await db
+    .from("likes")
+    .select("id")
+    .eq("post_id", postId)
+    .eq("user_id", currentUser.id)
+    .maybeSingle();
+
+  if (existing) {
+    await db.from("likes").delete().eq("id", existing.id);
+  } else {
+    const { error } = await db.from("likes").insert({
+      post_id: postId,
+      user_id: currentUser.id
+    });
+
+    if (error) return notify(error.message, true);
+  }
+
+  await loadPosts();
+  await loadMyPosts();
+});
+
+// =========================================
+// COMMENTS
+// =========================================
+
+async function loadComments(postId) {
+  const { data, error } = await db
+    .from("comments")
+    .select("*")
+    .eq("post_id", postId)
+    .order("created_at");
+
+  if (error) return;
+
+  const container = $("comments-" + postId);
+  if (!container) return;
+
+  container.innerHTML = "";
+
+  for (const comment of data || []) {
+    const profile = await getProfile(comment.user_id).catch(() => null);
+
+    const p = document.createElement("p");
+    p.innerHTML = `<strong>${escapeHTML(profileName(profile))}:</strong> ${escapeHTML(comment.content || comment.comment || "")}`;
+    container.appendChild(p);
+  }
+}
+
+document.addEventListener("click", async event => {
+  const button = event.target.closest("[data-comment]");
+  if (!button || !currentUser) return;
+
+  const postId = button.dataset.comment;
+  const input = $("comment-" + postId);
+  const content = input.value.trim();
+
+  if (!content) return;
+
+  const { error } = await db.from("comments").insert({
+    post_id: postId,
+    user_id: currentUser.id,
+    content
+  });
+
+  if (error) return notify(error.message, true);
+
+  input.value = "";
+  await loadComments(postId);
+});
+
+document.addEventListener("click", event => {
+  const button = event.target.closest("[data-comment-focus]");
+  if (!button) return;
+
+  $("comment-" + button.dataset.commentFocus)?.focus();
+});
+
+// =========================================
+// DELETE POSTS
+// =========================================
+
+document.addEventListener("click", async event => {
+  const button = event.target.closest("[data-delete-post]");
+  if (!button) return;
+
+  if (!confirm("Delete this post?")) return;
+
+  const { error } = await db
+    .from("posts")
+    .delete()
+    .eq("id", button.dataset.deletePost)
+    .eq("user_id", currentUser.id);
+
+  if (error) return notify(error.message, true);
+
+  notify("Post deleted.");
+  await loadPosts();
+  await loadMyPosts();
+});
+
+// =========================================
+// MY PROFILE POSTS AND COUNTS
+// =========================================
+
+async function loadMyPosts() {
+  if (!currentUser) return;
+
+  const { data, error } = await db
+    .from("posts")
+    .select("*")
+    .eq("user_id", currentUser.id)
+    .order("created_at", { ascending: false });
+
+  if (error) return;
+
+  $("postCount").textContent = data.length;
+
+  $("profilePosts").innerHTML = data.length
+    ? data.map(post => `
+        <div class="public-profile-post">
+          ${post.media_url
+            ? post.media_type === "video"
+              ? `<video src="${escapeHTML(post.media_url)}"></video>`
+              : `<img src="${escapeHTML(post.media_url)}" alt="">`
+            : `<div>${escapeHTML(post.caption)}</div>`}
+        </div>
+      `).join("")
+    : `<div class="empty-state">
+         <div>✦</div>
+         <h3>Your story starts here</h3>
+         <p>Your shared moments will appear here.</p>
+       </div>`;
+
+  await loadMyCounts();
+}
+
+async function loadMyCounts() {
+  if (!currentUser) return;
+
+  const { count: followers } = await db
+    .from("follows")
+    .select("*", { count: "exact", head: true })
+    .eq("following_id", currentUser.id);
+
+  const { count: following } = await db
+    .from("follows")
+    .select("*", { count: "exact", head: true })
+    .eq("follower_id", currentUser.id);
+
+  $("followerCount").textContent = followers || 0;
+  $("followingCount").textContent = following || 0;
+}
+
+// =========================================
+// SEARCH USERS
+// =========================================
+
+let searchTimer;
+
+async function loadSearch() {
+  const input = $("search");
+  if (!input) return;
+
+  input.setAttribute("autocomplete", "off");
+  input.setAttribute("autocorrect", "off");
+  input.setAttribute("autocapitalize", "none");
+  input.setAttribute("spellcheck", "false");
+  input.setAttribute("name", "leaka-user-search");
+
+  input.addEventListener("input", () => {
+    clearTimeout(searchTimer);
+
+    const query = input.value.trim();
+
+    if (query.length < 2) {
+      $("searchResults").innerHTML = "";
+      return;
+    }
+
+    searchTimer = setTimeout(() => searchUsers(query), 350);
   });
 }
+
+async function searchUsers(query) {
+  const results = $("searchResults");
+
+  const { data, error } = await db
+    .from("profiles")
+    .select("id,username,display_name,avatar_url,is_private")
+    .or(`username.ilike.%${query}%,display_name.ilike.%${query}%`)
+    .limit(15);
+
+  if (error) {
+    console.error(error);
+    return;
+  }
+
+  results.innerHTML = "";
+
+  if (!data.length) {
+    results.innerHTML = `
+      <div class="search-user">
+        No people found.
+      </div>`;
+    return;
+  }
+
+  data.filter(profile => profile.id !== currentUser.id).forEach(profile => {
+    const item = document.createElement("div");
+    item.className = "search-user";
+
+    item.innerHTML = `
+      <div class="search-user-avatar">
+        ${avatarHTML(profile.avatar_url, profileName(profile))}
+      </div>
+      <div>
+        <strong>${escapeHTML(profileName(profile))}</strong>
+        <span>@${escapeHTML(username(profile))}</span>
+      </div>
+    `;
+
+    item.addEventListener("click", () => {
+      results.innerHTML = "";
+      $("search").blur();
+      openPublicProfile(profile.id);
+    });
+
+    results.appendChild(item);
+  });
+}
+
+// =========================================
+// PUBLIC PROFILE SYSTEM
+// =========================================
+
+function createProfileOverlay() {
+  let overlay = $("publicProfileOverlay");
+
+  if (!overlay) {
+    overlay = document.createElement("div");
+    overlay.id = "publicProfileOverlay";
+    overlay.hidden = true;
+    document.body.appendChild(overlay);
+
+    overlay.addEventListener("click", event => {
+      if (event.target === overlay) closePublicProfile();
+    });
+  }
+
+  return overlay;
+}
+
+function closePublicProfile() {
+  const overlay = $("publicProfileOverlay");
+  if (overlay) overlay.hidden = true;
+  activePublicUser = null;
+}
+
+async function openPublicProfile(userId) {
+  if (!currentUser) return;
+
+  if (userId === currentUser.id) {
+    showPage("profile");
+    return;
+  }
+
+  const overlay = createProfileOverlay();
+  overlay.hidden = false;
+  overlay.innerHTML = `
+    <div class="public-profile-card">
+      <div class="public-profile-cover">
+        <button class="public-profile-close" onclick="closePublicProfile()">×</button>
+      </div>
+      <div class="public-profile-body">
+        <p style="padding:30px;text-align:center">Loading profile...</p>
+      </div>
+    </div>
+  `;
+
+  const profile = await getProfile(userId).catch(() => null);
+
+  if (!profile) {
+    overlay.innerHTML = `
+      <div class="public-profile-card">
+        <button class="public-profile-close" onclick="closePublicProfile()">×</button>
+        <div class="public-profile-body">
+          <p class="public-profile-private">This profile could not be found.</p>
+        </div>
+      </div>`;
+    return;
+  }
+
+  activePublicUser = profile;
+
+  const local = (() => {
+    try {
+      return JSON.parse(localStorage.getItem("leaka_profile_" + userId) || "{}");
+    } catch {
+      return {};
+    }
+  })();
+
+  const { data: follow } = await db
+    .from("follows")
+    .select("follower_id")
+    .eq("follower_id", currentUser.id)
+    .eq("following_id", userId)
+    .maybeSingle();
+
+  const { data: request } = await db
+    .from("follow_requests")
+    .select("id,status")
+    .eq("requester_id", currentUser.id)
+    .eq("receiver_id", userId)
+    .eq("status", "pending")
+    .maybeSingle();
+
+  const { count: followers } = await db
+    .from("follows")
+    .select("*", { count: "exact", head: true })
+    .eq("following_id", userId);
+
+  const { count: following } = await db
+    .from("follows")
+    .select("*", { count: "exact", head: true })
+    .eq("follower_id", userId);
+
+  const isPrivate = profile.is_private === true;
+  const isFollowing = !!follow;
+  const isPending = !!request;
+
+  const canSeePosts = !isPrivate || isFollowing;
+
+  const cover = local.cover || "";
+  const avatar = profile.avatar_url || local.avatar || "";
+
+  overlay.innerHTML = `
+    <div class="public-profile-card">
+
+      <div class="public-profile-cover">
+        ${cover ? `<img src="${escapeHTML(cover)}" alt="">` : ""}
+        <button class="public-profile-close" onclick="closePublicProfile()">×</button>
+      </div>
+
+      <div class="public-profile-body">
+
+        <div class="public-profile-top">
+          <div class="public-profile-avatar">
+            ${avatarHTML(avatar, profileName(profile))}
+          </div>
+
+          <div class="public-profile-actions">
+            <button
+              class="public-follow-btn ${isFollowing ? "following" : ""}"
+              id="publicFollowBtn"
+              data-target-user="${userId}">
+              ${isFollowing ? "✓ Following" : isPending ? "Requested" : "Follow"}
+            </button>
+            <button class="public-message-btn" onclick="notify('Messaging is coming soon 💜')">
+              Message
+            </button>
+          </div>
+        </div>
+
+        <h2 class="public-profile-name">${escapeHTML(profileName(profile))}</h2>
+        <p class="public-profile-handle">@${escapeHTML(username(profile))}</p>
+
+        <p class="public-profile-bio">
+          ${escapeHTML(profile.bio || "Living my LEAKA life 💜")}
+        </p>
+
+        <div class="public-profile-stats">
+          <div>
+            <strong>${canSeePosts ? "..." : "—"}</strong>
+            <span>Posts</span>
+          </div>
+          <div>
+            <strong>${followers || 0}</strong>
+            <span>Followers</span>
+          </div>
+          <div>
+            <strong>${following || 0}</strong>
+            <span>Following</span>
+          </div>
+        </div>
+
+        ${canSeePosts ? `
+          <div class="public-profile-tabs">
+            <button class="selected">Posts</button>
+          </div>
+          <div class="public-profile-posts" id="publicProfilePosts">
+            <div class="public-profile-post-empty">Loading posts...</div>
+          </div>
+        ` : `
+          <div class="public-profile-private">
+            <div style="font-size:38px;margin-bottom:12px">🔒</div>
+            <strong>This account is private</strong>
+            Follow this account to see their photos and videos.
+          </div>
+        `}
+
+      </div>
+    </div>
+  `;
+
+  if (canSeePosts) {
+    await loadPublicPosts(userId);
+  }
+
+  $("publicFollowBtn")?.addEventListener("click", toggleFollow);
+}
+
+// =========================================
+// FOLLOW / UNFOLLOW / REQUEST
+// =========================================
+
+async function toggleFollow() {
+  if (!currentUser || !activePublicUser) return;
+
+  const targetId = activePublicUser.id;
+  const button = $("publicFollowBtn");
+
+  if (!button) return;
+
+  button.disabled = true;
+
+  try {
+    const { data: existingFollow } = await db
+      .from("follows")
+      .select("follower_id")
+      .eq("follower_id", currentUser.id)
+      .eq("following_id", targetId)
+      .maybeSingle();
+
+    if (existingFollow) {
+      const { error } = await db
+        .from("follows")
+        .delete()
+        .eq("follower_id", currentUser.id)
+        .eq("following_id", targetId);
+
+      if (error) throw error;
+
+      notify("Unfollowed.");
+      await openPublicProfile(targetId);
+      return;
+    }
+
+    const { data: existingRequest } = await db
+      .from("follow_requests")
+      .select("id,status")
+      .eq("requester_id", currentUser.id)
+      .eq("receiver_id", targetId)
+      .eq("status", "pending")
+      .maybeSingle();
+
+    if (existingRequest) {
+      notify("Your request is already pending.");
+      return;
+    }
+
+    if (activePublicUser.is_private) {
+      const { error } = await db
+        .from("follow_requests")
+        .insert({
+          requester_id: currentUser.id,
+          receiver_id: targetId,
+          status: "pending"
+        });
+
+      if (error) throw error;
+
+      await createNotification(
+        targetId,
+        "follow_request",
+        "sent you a follow request"
+      );
+
+      notify("Follow request sent 💜");
+
+    } else {
+      const { error } = await db
+        .from("follows")
+        .insert({
+          follower_id: currentUser.id,
+          following_id: targetId
+        });
+
+      if (error) throw error;
+
+      await createNotification(
+        targetId,
+        "follow",
+        "started following you"
+      );
+
+      notify("You're now following this person! 💜");
+    }
+
+    await openPublicProfile(targetId);
+
+  } catch (error) {
+    console.error(error);
+    notify(error.message, true);
+  } finally {
+    const currentButton = $("publicFollowBtn");
+    if (currentButton) currentButton.disabled = false;
+  }
+}
+
+// =========================================
+// PUBLIC PROFILE POSTS
+// =========================================
+
+async function loadPublicPosts(userId) {
+  const container = $("publicProfilePosts");
+  if (!container) return;
+
+  const { data, error } = await db
+    .from("posts")
+    .select("*")
+    .eq("user_id", userId)
+    .order("created_at", { ascending: false });
+
+  if (error) {
+    container.innerHTML = `
+      <div class="public-profile-post-empty">
+        Posts could not be loaded.
+      </div>`;
+    return;
+  }
+
+  const countElement = container
+    .closest(".public-profile-body")
+    ?.querySelector(".public-profile-stats strong");
+
+  if (countElement) countElement.textContent = data.length;
+
+  if (!data.length) {
+    container.innerHTML = `
+      <div class="public-profile-post-empty">
+        No posts yet. Check back later 💜
+      </div>`;
+    return;
+  }
+
+  container.innerHTML = data.map(post => `
+    <div class="public-profile-post">
+      ${post.media_url
+        ? post.media_type === "video"
+          ? `<video src="${escapeHTML(post.media_url)}" muted playsinline></video>`
+          : `<img src="${escapeHTML(post.media_url)}" alt="">`
+        : `<div style="padding:12px;font-size:12px">${escapeHTML(post.caption)}</div>`
+      }
+    </div>
+  `).join("");
+}
+
+// =========================================
+// NOTIFICATIONS
+// =========================================
+
+async function createNotification(userId, type, message) {
+  if (!currentUser) return;
+
+  const { error } = await db
+    .from("notifications")
+    .insert({
+      user_id: userId,
+      actor_id: currentUser.id,
+      type,
+      message,
+      is_read: false
+    });
+
+  if (error) console.error("Notification error:", error);
+}
+
+// =========================================
+// FOLLOW REQUEST MANAGEMENT
+// =========================================
+
+async function loadFollowRequests() {
+  if (!currentUser) return [];
+
+  const { data, error } = await db
+    .from("follow_requests")
+    .select("*")
+    .eq("receiver_id", currentUser.id)
+    .eq("status", "pending")
+    .order("created_at", { ascending: false });
+
+  if (error) {
+    console.error(error);
+    return [];
+  }
+
+  return data || [];
+}
+
+async function renderFollowRequests(container) {
+  const requests = await loadFollowRequests();
+
+  if (!requests.length) {
+    container.innerHTML = `
+      <p style="color:#9584a3;padding:15px 0">
+        No pending follow requests.
+      </p>`;
+    return;
+  }
+
+  container.innerHTML = "";
+
+  for (const request of requests) {
+    const profile = await getProfile(request.requester_id).catch(() => null);
+
+    if (!profile) continue;
+
+    const item = document.createElement("div");
+    item.className = "request-list-item";
+
+    item.innerHTML = `
+      <div class="request-avatar">
+        ${avatarHTML(profile.avatar_url, profileName(profile))}
+      </div>
+      <div class="request-info">
+        <strong>${escapeHTML(profileName(profile))}</strong>
+        <small>@${escapeHTML(username(profile))}</small>
+      </div>
+      <button data-accept-request="${request.id}">Accept</button>
+      <button class="decline" data-decline-request="${request.id}">×</button>
+    `;
+
+    container.appendChild(item);
+  }
+}
+
+async function handleFollowRequest(requestId, accepted) {
+  if (!currentUser) return;
+
+  const { data: request, error: fetchError } = await db
+    .from("follow_requests")
+    .select("*")
+    .eq("id", requestId)
+    .eq("receiver_id", currentUser.id)
+    .single();
+
+  if (fetchError) return notify(fetchError.message, true);
+
+  const { error } = await db
+    .from("follow_requests")
+    .update({
+      status: accepted ? "accepted" : "declined"
+    })
+    .eq("id", requestId)
+    .eq("receiver_id", currentUser.id);
+
+  if (error) return notify(error.message, true);
+
+  if (accepted) {
+    const { error: followError } = await db
+      .from("follows")
+      .upsert({
+        follower_id: request.requester_id,
+        following_id: currentUser.id
+      });
+
+    if (followError) {
+      notify(followError.message, true);
+      return;
+    }
+
+    await createNotification(
+      request.requester_id,
+      "request_accepted",
+      "accepted your follow request"
+    );
+
+    notify("Follow request accepted 💜");
+  } else {
+    notify("Follow request declined.");
+  }
+
+  const container = $("followRequestsList");
+  if (container) await renderFollowRequests(container);
+
+  await loadMyCounts();
+}
+
+document.addEventListener("click", event => {
+  const accept = event.target.closest("[data-accept-request]");
+  const decline = event.target.closest("[data-decline-request]");
+
+  if (accept) {
+    handleFollowRequest(accept.dataset.acceptRequest, true);
+  }
+
+  if (decline) {
+    handleFollowRequest(decline.dataset.declineRequest, false);
+  }
+});
+
+// =========================================
+// PROFILE TABS
+// =========================================
 
 document.querySelectorAll("[data-profile-tab]").forEach(button => {
   button.addEventListener("click", () => {
@@ -1043,736 +1586,75 @@ document.querySelectorAll("[data-profile-tab]").forEach(button => {
     });
 
     button.classList.add("selected");
-    profilePostsTab = button.dataset.profileTab;
-    renderProfilePosts();
+
+    const type = button.dataset.profileTab;
+
+    if (type === "posts") {
+      loadMyPosts();
+    } else if (type === "videos") {
+      loadMyPosts();
+      notify("Video filtering is coming soon.");
+    } else {
+      notify("Liked posts view is coming soon.");
+    }
   });
 });
 
-/* =========================================
-   FOLLOW SYSTEM
-========================================= */
-
-async function getFollowStatus(userId) {
-  const [followingResult, requestResult] = await Promise.all([
-    supabaseClient
-      .from("follows")
-      .select("follower_id")
-      .eq("follower_id", currentUser.id)
-      .eq("following_id", userId)
-      .maybeSingle(),
-
-    supabaseClient
-      .from("follow_requests")
-      .select("id, status")
-      .eq("requester_id", currentUser.id)
-      .eq("receiver_id", userId)
-      .eq("status", "pending")
-      .maybeSingle()
-  ]);
-
-  if (followingResult.error) throw followingResult.error;
-  if (requestResult.error) throw requestResult.error;
-
-  if (followingResult.data) return "following";
-  if (requestResult.data) return "requested";
-
-  return "not_following";
-}
-
-async function sendNotification(userId, type, text) {
-  if (!currentUser || userId === currentUser.id) return;
-
-  const { error } = await supabaseClient
-    .from("notifications")
-    .insert({
-      user_id: userId,
-      actor_id: currentUser.id,
-      type,
-      message: text,
-      is_read: false
-    });
-
-  if (error) {
-    console.warn("Notification failed:", error.message);
-  }
-}
-
-async function followUser(user) {
-  if (!currentUser || user.id === currentUser.id) return;
-
-  try {
-    if (user.is_private) {
-      const { error } = await supabaseClient
-        .from("follow_requests")
-        .insert({
-          requester_id: currentUser.id,
-          receiver_id: user.id,
-          status: "pending"
-        });
-
-      if (error) throw error;
-
-      await sendNotification(
-        user.id,
-        "follow_request",
-        `${profile.name} requested to follow you.`
-      );
-
-      alert("Follow request sent! 💜");
-
-    } else {
-      const { error } = await supabaseClient
-        .from("follows")
-        .insert({
-          follower_id: currentUser.id,
-          following_id: user.id
-        });
-
-      if (error) throw error;
-
-      await sendNotification(
-        user.id,
-        "follow",
-        `${profile.name} started following you.`
-      );
-
-      alert("You're now following this user! 💜");
-    }
-
-    await openUserProfile(user);
-
-  } catch (error) {
-    alert("Follow failed: " + error.message);
-  }
-}
-
-async function unfollowUser(userId) {
-  if (!confirm("Are you sure you want to unfollow this user?")) return;
-
-  try {
-    const { error } = await supabaseClient
-      .from("follows")
-      .delete()
-      .eq("follower_id", currentUser.id)
-      .eq("following_id", userId);
-
-    if (error) throw error;
-
-    alert("You unfollowed this user.");
-
-    if (currentPublicUser) {
-      await openUserProfile(currentPublicUser);
-    }
-
-  } catch (error) {
-    alert("Unfollow failed: " + error.message);
-  }
-}
-
-/* =========================================
-   FOLLOW COUNTS
-========================================= */
-
-async function getFollowCounts(userId) {
-  const [followers, following] = await Promise.all([
-    supabaseClient
-      .from("follows")
-      .select("*", { count: "exact", head: true })
-      .eq("following_id", userId),
-
-    supabaseClient
-      .from("follows")
-      .select("*", { count: "exact", head: true })
-      .eq("follower_id", userId)
-  ]);
-
-  if (followers.error) throw followers.error;
-  if (following.error) throw following.error;
-
-  return {
-    followers: followers.count || 0,
-    following: following.count || 0
-  };
-}
-
-async function loadMyFollowCounts() {
-  if (!currentUser || !$("profile")) return;
-
-  try {
-    const counts = await getFollowCounts(currentUser.id);
-
-    let area = $("myFollowCounts");
-
-    if (!area) {
-      area = document.createElement("div");
-      area.id = "myFollowCounts";
-      area.className = "profile-stats";
-      $("profile")?.appendChild(area);
-    }
-
-    area.textContent =
-      `${counts.followers} Followers · ${counts.following} Following`;
-
-  } catch (error) {
-    console.warn("Follow counts:", error.message);
-  }
-}
-
-/* =========================================
-   PUBLIC USER PROFILE
-========================================= */
-
-async function openUserProfile(user) {
-  if (!currentUser) return;
-
-  if (user.id === currentUser.id) {
-    showPage("profile");
-    return;
-  }
-
-  currentPublicUser = user;
-
-  let page = $("publicProfilePage");
-
-  if (!page) {
-    page = document.createElement("section");
-    page.id = "publicProfilePage";
-    page.className = "page";
-    page.hidden = true;
-    $("appContent")?.appendChild(page);
-  }
-
-  page.replaceChildren();
-
-  const back = makeButton(
-    "← Back",
-    "action-btn",
-    () => showPage("home")
-  );
-
-  page.appendChild(back);
-
-  try {
-    const { data: freshUser, error } = await supabaseClient
-      .from("profiles")
-      .select("*")
-      .eq("id", user.id)
-      .single();
-
-    if (error) throw error;
-
-    user = freshUser;
-    currentPublicUser = user;
-
-    const header = document.createElement("div");
-    header.className = "public-profile-header";
-    header.style.textAlign = "center";
-    header.style.padding = "25px";
-
-    const avatar = document.createElement("div");
-    avatar.className = "search-user-avatar";
-    avatar.style.width = "100px";
-    avatar.style.height = "100px";
-    avatar.style.margin = "15px auto";
-
-    renderAvatar(
-      avatar,
-      user.display_name || user.username,
-      user.avatar_url
-    );
-
-    const name = document.createElement("h2");
-    name.textContent = user.display_name || user.username;
-
-    const username = document.createElement("p");
-    username.textContent = "@" + user.username;
-
-    const bio = document.createElement("p");
-    bio.textContent = user.bio || "No bio yet.";
-
-    const counts = await getFollowCounts(user.id);
-
-    const stats = document.createElement("p");
-    stats.textContent =
-      `${counts.followers} Followers · ${counts.following} Following`;
-
-    header.append(avatar, name, username, bio, stats);
-    page.appendChild(header);
-
-    const status = await getFollowStatus(user.id);
-
-    const followArea = document.createElement("div");
-    followArea.style.textAlign = "center";
-    followArea.style.padding = "10px";
-
-    if (status === "following") {
-      followArea.appendChild(
-        makeButton(
-          "Following ✓",
-          "action-btn",
-          () => unfollowUser(user.id)
-        )
-      );
-    } else if (status === "requested") {
-      followArea.appendChild(
-        makeButton("Requested ⏳", "action-btn", () => {})
-      );
-    } else {
-      followArea.appendChild(
-        makeButton(
-          user.is_private ? "Request to Follow" : "Follow +",
-          "action-btn",
-          () => followUser(user)
-        )
-      );
-    }
-
-    page.appendChild(followArea);
-
-    const postsTitle = document.createElement("h3");
-    postsTitle.textContent = "Posts";
-    page.appendChild(postsTitle);
-
-    const posts = document.createElement("div");
-    posts.id = "publicUserPosts";
-    page.appendChild(posts);
-
-    showPage("publicProfilePage");
-
-    if (user.is_private && status !== "following") {
-      posts.textContent = "🔒 This account is private. Follow to see posts.";
-      return;
-    }
-
-    posts.textContent = "Loading posts...";
-
-    const { data, error: postError } = await supabaseClient
-      .from("posts")
-      .select("*")
-      .eq("user_id", user.id)
-      .order("created_at", { ascending: false });
-
-    if (postError) throw postError;
-
-    posts.replaceChildren();
-
-    if (!data || !data.length) {
-      posts.textContent = "This user hasn't posted anything yet.";
-      return;
-    }
-
-    const originalUser = currentUser;
-    const originalProfile = profile;
-
-    // Render another user's posts without showing your edit controls.
-    const oldCurrentUser = currentUser;
-    const oldProfile = profile;
-
-    data.forEach(post => {
-      posts.appendChild(createPublicPostElement(post, user));
-    });
-
-  } catch (error) {
-    console.error("Public profile error:", error);
-    page.appendChild(
-      document.createTextNode("Could not load profile: " + error.message)
-    );
-    showPage("publicProfilePage");
-  }
-}
-
-function createPublicPostElement(post, user) {
-  const article = document.createElement("article");
-  article.className = "post-card";
-
-  const header = document.createElement("div");
-  header.className = "post-header";
-
-  const avatar = document.createElement("div");
-  avatar.className = "post-avatar";
-  renderAvatar(avatar, user.display_name || user.username, user.avatar_url);
-
-  const info = document.createElement("div");
-
-  const name = document.createElement("div");
-  name.className = "post-user";
-  name.textContent = user.display_name || user.username;
-
-  const time = document.createElement("div");
-  time.className = "post-time";
-  time.textContent = post.created_at
-    ? new Date(post.created_at).toLocaleString()
-    : "";
-
-  info.append(name, time);
-  header.append(avatar, info);
-  article.append(header);
-
-  if (post.caption) {
-    const caption = document.createElement("p");
-    caption.className = "post-caption";
-    caption.textContent = post.caption;
-    article.append(caption);
-  }
-
-  if (post.media_url) {
-    const media = document.createElement(
-      post.media_type === "video" ? "video" : "img"
-    );
-
-    media.src = post.media_url;
-    media.className = "post-media";
-
-    if (post.media_type === "video") {
-      media.controls = true;
-      media.playsInline = true;
-    } else {
-      media.loading = "lazy";
-    }
-
-    article.append(media);
-  }
-
-  const likes = allLikes.filter(l => l.post_id === post.id);
-  const liked = likes.some(l => l.user_id === currentUser.id);
-
-  article.appendChild(
-    makeButton(
-      `${liked ? "❤️" : "🤍"} ${likes.length} Likes`,
-      "action-btn",
-      () => toggleLike(post.id)
-    )
-  );
-
-  return article;
-}
-
-/* =========================================
-   FOLLOW REQUESTS
-========================================= */
-
-async function loadIncomingRequests() {
-  if (!currentUser) return;
-
-  const { data, error } = await supabaseClient
-    .from("follow_requests")
-    .select("*")
-    .eq("receiver_id", currentUser.id)
-    .eq("status", "pending")
-    .order("created_at", { ascending: false });
-
-  if (error) {
-    console.warn("Follow requests:", error.message);
-    return;
-  }
-
-  let section = $("followRequests");
-
-  if (!section) {
-    section = document.createElement("section");
-    section.id = "followRequests";
-    section.className = "page";
-    section.hidden = true;
-    section.innerHTML = "<h2>Follow Requests 💜</h2>";
-
-    $("appContent")?.appendChild(section);
-
-    const nav = document.createElement("button");
-    nav.className = "nav-item";
-    nav.dataset.page = "followRequests";
-    nav.textContent = "Follow Requests";
-    nav.addEventListener("click", () => showPage("followRequests"));
-
-    $("appContent")?.appendChild(nav);
-  }
-
-  section.replaceChildren();
-
-  const title = document.createElement("h2");
-  title.textContent = "Follow Requests 💜";
-  section.appendChild(title);
-
-  if (!data || !data.length) {
-    section.appendChild(document.createTextNode("No pending requests."));
-    return;
-  }
-
-  for (const request of data) {
-    const { data: requester } = await supabaseClient
-      .from("profiles")
-      .select("id, username, display_name, avatar_url")
-      .eq("id", request.requester_id)
-      .maybeSingle();
-
-    if (!requester) continue;
-
-    const item = document.createElement("div");
-    item.className = "search-user";
-
-    const name = document.createElement("strong");
-    name.textContent =
-      requester.display_name || requester.username;
-
-    const username = document.createElement("span");
-    username.textContent = "@" + requester.username;
-
-    const accept = makeButton(
-      "Accept",
-      "action-btn",
-      () => acceptFollowRequest(request, requester)
-    );
-
-    const decline = makeButton(
-      "Decline",
-      "action-btn",
-      () => declineFollowRequest(request)
-    );
-
-    item.append(name, username, accept, decline);
-    section.appendChild(item);
-  }
-}
-
-async function acceptFollowRequest(request, requester) {
-  try {
-    const { error: followError } = await supabaseClient
-      .from("follows")
-      .insert({
-        follower_id: request.requester_id,
-        following_id: currentUser.id
-      });
-
-    if (followError) throw followError;
-
-    const { error: updateError } = await supabaseClient
-      .from("follow_requests")
-      .update({ status: "accepted" })
-      .eq("id", request.id)
-      .eq("receiver_id", currentUser.id);
-
-    if (updateError) throw updateError;
-
-    await sendNotification(
-      request.requester_id,
-      "request_accepted",
-      `${profile.name} accepted your follow request.`
-    );
-
-    alert("Follow request accepted! 💜");
-
-    await loadIncomingRequests();
-    await loadNotifications();
-
-  } catch (error) {
-    alert("Could not accept request: " + error.message);
-  }
-}
-
-async function declineFollowRequest(request) {
-  try {
-    const { error } = await supabaseClient
-      .from("follow_requests")
-      .update({ status: "rejected" })
-      .eq("id", request.id)
-      .eq("receiver_id", currentUser.id);
-
-    if (error) throw error;
-
-    alert("Request declined.");
-
-    await loadIncomingRequests();
-
-  } catch (error) {
-    alert("Could not decline request: " + error.message);
-  }
-}
-
-/* =========================================
-   NOTIFICATIONS
-========================================= */
-
-async function loadNotifications() {
-  if (!currentUser) return;
-
-  const { data, error } = await supabaseClient
-    .from("notifications")
-    .select("*")
-    .eq("user_id", currentUser.id)
-    .order("created_at", { ascending: false })
-    .limit(50);
-
-  if (error) {
-    console.warn("Notifications:", error.message);
-    return;
-  }
-
-  let page = $("notificationsPage");
-
-  if (!page) {
-    page = document.createElement("section");
-    page.id = "notificationsPage";
-    page.className = "page";
-    page.hidden = true;
-    $("appContent")?.appendChild(page);
-
-    const nav = document.createElement("button");
-    nav.className = "nav-item";
-    nav.dataset.page = "notificationsPage";
-    nav.textContent = "Notifications 🔔";
-    nav.addEventListener("click", () => {
-      showPage("notificationsPage");
-      loadNotifications();
-    });
-
-    $("appContent")?.appendChild(nav);
-  }
-
-  page.replaceChildren();
-
-  const title = document.createElement("h2");
-  title.textContent = "Notifications 🔔";
-  page.appendChild(title);
-
-  if (!data || !data.length) {
-    page.appendChild(document.createTextNode("You're all caught up! 💜"));
-    return;
-  }
-
-  for (const notification of data) {
-    const item = document.createElement("div");
-    item.className = "search-user";
-
-    if (!notification.is_read) {
-      item.style.borderLeft = "3px solid #a855f7";
-    }
-
-    const text = document.createElement("p");
-    text.textContent = notification.message || "New notification";
-
-    const date = document.createElement("small");
-    date.textContent = notification.created_at
-      ? new Date(notification.created_at).toLocaleString()
-      : "";
-
-    item.append(text, date);
-
-    item.addEventListener("click", async () => {
-      await supabaseClient
-        .from("notifications")
-        .update({ is_read: true })
-        .eq("id", notification.id)
-        .eq("user_id", currentUser.id);
-
-      await loadNotifications();
-    });
-
-    page.appendChild(item);
-  }
-}
-
-/* =========================================
-   ACCOUNT SEARCH
-========================================= */
-
-async function searchUsers(query) {
-  const results = $("searchResults");
-  if (!results) return;
-
-  results.replaceChildren();
-
-  if (!query) {
-    results.style.display = "none";
-    return;
-  }
-
-  results.style.display = "block";
-  results.textContent = "Searching LEAKA...";
-
-  try {
-    const { data, error } = await supabaseClient
-      .from("profiles")
-      .select("id, username, display_name, avatar_url, is_private")
-      .or(
-        `username.ilike.%${query}%,display_name.ilike.%${query}%`
-      )
-      .limit(30);
-
-    if (error) throw error;
-
-    results.replaceChildren();
-
-    const users = (data || []).filter(
-      user => user.id !== currentUser?.id
-    );
-
-    if (!users.length) {
-      results.textContent = "No LEAKA users found.";
-      return;
-    }
-
-    users.forEach(user => {
-      const item = document.createElement("div");
-      item.className = "search-user";
-
-      const avatar = document.createElement("div");
-      avatar.className = "search-user-avatar";
-
-      renderAvatar(
-        avatar,
-        user.display_name || user.username,
-        user.avatar_url
-      );
-
-      const info = document.createElement("div");
-
-      const name = document.createElement("strong");
-      name.textContent = user.display_name || user.username;
-
-      const username = document.createElement("span");
-      username.textContent = "@" + user.username;
-
-      info.append(name, username);
-      item.append(avatar, info);
-
-      item.addEventListener("click", () => {
-        results.replaceChildren();
-        results.style.display = "none";
-        $("search").value = "";
-        openUserProfile(user);
-      });
-
-      results.appendChild(item);
-    });
-
-  } catch (error) {
-    console.error("Search error:", error);
-    results.textContent = "Search error: " + error.message;
-  }
-}
-
-on("search", "input", event => {
-  clearTimeout(searchTimeout);
-
-  const query = event.target.value.trim().replace(/^@/, "");
-
-  searchTimeout = setTimeout(() => {
-    searchUsers(query);
-  }, 300);
+// =========================================
+// STORIES
+// =========================================
+
+$("createStoryBtn")?.addEventListener("click", () => {
+  $("storyInput")?.click();
 });
 
-/* =========================================
-   STORIES
-========================================= */
+$("storyInput")?.addEventListener("change", async event => {
+  const file = event.target.files[0];
+  if (!file) return;
 
-on("createStoryBtn", "click", () => {
-  alert("LEAKA Stories are coming soon! 💜");
+  const url = await uploadMedia(file, "stories");
+  if (!url) return;
+
+  notify("Story uploaded to storage. Story publishing is coming soon.");
 });
 
-/* =========================================
-   START APP
-========================================= */
+// =========================================
+// PRIVACY SETTING
+// =========================================
 
-initializeApp();
+async function loadPrivacySetting() {
+  if (!currentUser || !$("privateAccount")) return;
 
-console.log("LEAKA initialized successfully 💜");
-console.log("LEAKA social features enabled 💜");
+  $("privateAccount").checked = !!currentProfile?.is_private;
+}
+
+$("privateAccount")?.addEventListener("change", async event => {
+  const isPrivate = event.target.checked;
+
+  const { data, error } = await db
+    .from("profiles")
+    .update({ is_private: isPrivate })
+    .eq("id", currentUser.id)
+    .select()
+    .single();
+
+  if (error) {
+    event.target.checked = !isPrivate;
+    notify(error.message, true);
+    return;
+  }
+
+  currentProfile = data;
+
+  notify(
+    isPrivate
+      ? "Your account is now private 🔒"
+      : "Your account is now public 💜"
+  );
+});
+
+// =========================================
+// START APP
+// =========================================
+
+checkSession();
