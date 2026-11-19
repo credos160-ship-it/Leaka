@@ -1,486 +1,248 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="theme-color" content="#090610">
-  <meta name="description" content="LEAKA — Your world. Your people.">
-  <title>LEAKA — Your World</title>
+  <meta name="theme-color" content="#100d16">
+  <title>LEAKA — Your Social Space</title>
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
 
-<!-- TOP BAR -->
-<header class="topbar">
-  <a href="#home" class="logo" data-page="home">lea<span>ka.</span></a>
+<!-- ================= AUTH ================= -->
 
-  <input type="search" id="search" placeholder="Search Leaka...">
+<section id="auth" class="page">
+  <div class="auth-card">
+    <div class="logo">LEAKA 💜</div>
+    <h2>Welcome to Leaka</h2>
+    <p>Your world. Your people. Your moments.</p>
 
-  <div class="topbar-actions">
-    <button class="icon-button" id="settingsGear" data-page="settings" aria-label="Settings">⚙</button>
-    <button class="avatar" id="profileBtn" aria-label="Your profile">U</button>
+    <input type="email" id="email" placeholder="Your email" autocomplete="email">
+    <input type="password" id="password" placeholder="Your password" autocomplete="current-password">
+
+    <button id="loginBtn">Log In</button>
+    <button id="signupBtn">Create Account</button>
+
+    <p id="authMessage"></p>
   </div>
-</header>
-<div id="searchResults" class="search-results"></div>
-
-<!-- AUTHENTICATION -->
-<section class="auth-card" id="auth">
-  <div class="auth-brand">leaka<span>.</span></div>
-  <p class="eyebrow">YOUR WORLD. YOUR PEOPLE.</p>
-  <h1>Find your people.</h1>
-  <p>Share your moments. Discover your world.</p>
-
-  <input type="email" id="email" placeholder="Your email" autocomplete="email">
-  <input type="password" id="password" placeholder="Your password" autocomplete="current-password">
-
-  <button id="signupBtn">Create account</button>
-  <button id="loginBtn">Log in</button>
-  <button id="logoutBtn" hidden>Log out</button>
-
-  <p id="authMessage"></p>
 </section>
 
-<!-- MAIN APP -->
+<!-- ================= MAIN APP ================= -->
+
 <div id="appContent" hidden>
 
-<main class="main-content">
+  <!-- TOP NAVIGATION -->
 
-<!-- HOME -->
-<section class="page active" id="home">
+  <header class="navbar">
+    <div class="logo">LEAKA</div>
 
-  <div class="welcome">
-    <p class="eyebrow">WELCOME TO YOUR SPACE</p>
-    <h1>Your world.<br><span>Your rules.</span></h1>
-    <p>There's always something happening on Leaka.</p>
-  </div>
+    <div class="nav-items">
+      <button class="nav-item active" data-page="feed">🏠 Home</button>
+      <button class="nav-item" data-page="searchPage">🔍 Search</button>
+      <button class="nav-item" data-page="profile">👤 Profile</button>
+      <button class="nav-item" data-page="settings">⚙️</button>
+    </div>
 
-  <!-- STORIES -->
-  <section class="moments-section">
-    <div class="section-heading">
+    <button id="profileBtn" title="My profile">U</button>
+  </header>
+
+  <!-- ================= HOME / FEED ================= -->
+
+  <main id="feed" class="page active">
+
+    <div class="section-header">
       <div>
-        <h2>Moments</h2>
-        <p>Little moments disappear after 24 hours.</p>
+        <h1>Your Feed ✨</h1>
+        <p class="muted">See what's happening on LEAKA.</p>
       </div>
     </div>
 
-    <div class="moments-row" id="storyList">
-      <button class="moment add-story" id="createStoryBtn">
-        ＋
-        <small>Your story</small>
-      </button>
+    <!-- STORIES -->
+
+    <section class="create-card">
+      <h3>Stories ✨</h3>
+      <p class="muted">Share a moment with your people.</p>
+      <input type="file" id="storyInput" accept="image/*,video/*" hidden>
+      <button id="createStoryBtn">＋ Create Story</button>
+    </section>
+
+    <!-- CREATE POST -->
+
+    <section class="create-card">
+      <h3>Create a post</h3>
+      <p class="muted">What's happening?</p>
+
+      <textarea id="caption" placeholder="Share something with LEAKA..."></textarea>
+
+      <input
+        type="file"
+        id="mediaInput"
+        accept="image/*,video/*"
+      >
+
+      <div id="preview"></div>
+
+      <button id="postBtn">Publish ↗</button>
+    </section>
+
+    <!-- POSTS -->
+
+    <section class="feed-section">
+      <h2>Latest Posts</h2>
+      <div id="posts"></div>
+    </section>
+
+  </main>
+
+  <!-- ================= SEARCH ================= -->
+
+  <main id="searchPage" class="page" hidden>
+    <div class="section-header">
+      <h1>Discover 🔍</h1>
     </div>
 
-    <input type="file" id="storyInput" accept="image/*,video/*" hidden>
-  </section>
-
-  <!-- CREATE POST -->
-  <section class="create-card" id="create">
-    <h3>Create something ✨</h3>
-
-    <textarea id="caption" placeholder="What's happening?"></textarea>
-
-    <div class="upload-row">
-      <label class="upload-btn">
-        ＋ Add photo/video
-        <input type="file" id="mediaInput" accept="image/*,video/*" hidden>
-      </label>
-
-      <button id="postBtn" class="post-btn">Publish ↗</button>
+    <div class="search-box">
+      <input
+        type="search"
+        id="search"
+        placeholder="Search people by name or username..."
+      >
     </div>
 
-    <div id="preview"></div>
-  </section>
+    <div id="searchResults"></div>
+  </main>
 
-  <!-- FEED -->
-  <section class="feed-section">
-    <div class="section-heading">
-      <div>
-        <h2>Your feed</h2>
-        <p>Little moments. Big memories.</p>
+  <!-- ================= MY PROFILE ================= -->
+
+  <main id="profile" class="page" hidden>
+
+    <div class="section-header">
+      <h1>My Profile</h1>
+      <button id="settingsGear">⚙️ Settings</button>
+    </div>
+
+    <section class="profile-card">
+
+      <div class="profile-cover">
+        <img id="profileCoverImage" hidden alt="Cover photo">
       </div>
-      <span class="live-dot">● LIVE</span>
-    </div>
 
-    <div id="posts">
-      <div class="empty-state">
-        <div>✦</div>
-        <h3>Your story starts here</h3>
-        <p>Be the first to share something.</p>
+      <div class="profile-info">
+
+        <div id="profileAvatar">U</div>
+
+        <h2 id="profileName">LEAKA User</h2>
+        <p id="profileEmail">@username</p>
+        <p id="profileBio">Welcome to my LEAKA space 💜</p>
+
+        <div class="profile-stats">
+          <div>
+            <strong id="postCount">0</strong>
+            <span>Posts</span>
+          </div>
+
+          <div>
+            <strong id="followerCount">0</strong>
+            <span>Followers</span>
+          </div>
+
+          <div>
+            <strong id="followingCount">0</strong>
+            <span>Following</span>
+          </div>
+        </div>
+
       </div>
-    </div>
-  </section>
+    </section>
 
-</section>
+    <!-- EDIT PROFILE -->
 
-<!-- REELS -->
-<section class="page" id="reels" hidden>
-  <div class="page-heading">
-    <p class="eyebrow">DISCOVER</p>
-    <h1>LEAKA Reels ✨</h1>
-    <p>Short videos, creative moments and things worth watching.</p>
-  </div>
-  <div class="coming-soon">VIDEO EXPERIENCES</div>
-</section>
+    <section class="profile-edit">
+      <h3>Edit Profile ✏️</h3>
 
-<!-- MESSAGES -->
-<section class="page" id="messages" hidden>
-  <div class="page-heading">
-    <p class="eyebrow">YOUR CONNECTIONS</p>
-    <h1>Messages 💌</h1>
-    <p>Stay connected with your people.</p>
-  </div>
+      <label>Profile picture</label>
+      <div id="editAvatar">U</div>
+      <input type="file" id="avatarInput" accept="image/*">
 
-  <div class="settings-card">
-    <div class="empty-state">
-      <div>✉</div>
-      <h3>Your conversations</h3>
-      <p>Your private conversations will appear here.</p>
-    </div>
-  </div>
-</section>
+      <label>Cover photo</label>
+      <div id="editCoverPreview"></div>
+      <input type="file" id="coverInput" accept="image/*">
 
-<!-- PROFILE -->
-<section class="page" id="profile" hidden>
+      <label>Display name</label>
+      <input type="text" id="displayName" placeholder="Your name">
 
-  <div class="profile-cover" id="profileCover">
-    <img id="profileCoverImage" alt="Profile cover" hidden>
-  </div>
+      <label>Bio</label>
+      <textarea id="bioInput" placeholder="Tell people about yourself..."></textarea>
 
-  <div class="profile-content">
+      <button id="saveProfileBtn">Save Profile 💜</button>
 
-    <div class="profile-top">
-      <div class="profile-avatar" id="profileAvatar">U</div>
+      <p id="profileMessage"></p>
+    </section>
 
-      <button class="secondary-btn" data-page="edit-profile">
-        Edit profile
-      </button>
-    </div>
+    <!-- PROFILE TABS -->
 
-    <div class="profile-name-row">
-      <h1 id="profileName">Your name</h1>
-      <span id="verifiedBadge" class="verified-badge" hidden>✓</span>
-    </div>
-
-    <p class="profile-handle" id="profileEmail">@username</p>
-
-    <p class="profile-bio" id="profileBio">
-      Welcome to my LEAKA space 💜
-    </p>
-
-    <div class="profile-stats">
-      <div>
-        <strong id="postCount">0</strong>
-        <span>Posts</span>
-      </div>
-      <div>
-        <strong id="followerCount">0</strong>
-        <span>Followers</span>
-      </div>
-      <div>
-        <strong id="followingCount">0</strong>
-        <span>Following</span>
-      </div>
-    </div>
-
-    <div class="profile-tabs">
+    <div class="public-profile-tabs">
       <button class="selected" data-profile-tab="posts">Posts</button>
       <button data-profile-tab="videos">Videos</button>
       <button data-profile-tab="liked">Liked</button>
     </div>
 
-    <div id="profilePosts" class="profile-post-grid">
-      <div class="empty-state">
-        <div>✦</div>
-        <h3>Your story starts here</h3>
-        <p>Your shared moments will appear here.</p>
-      </div>
+    <div id="profilePosts"></div>
+
+  </main>
+
+  <!-- ================= SETTINGS ================= -->
+
+  <main id="settings" class="page" hidden>
+
+    <div class="section-header">
+      <h1>Settings ⚙️</h1>
     </div>
 
-  </div>
-</section>
+    <section class="settings-card">
+      <h3>Account Information</h3>
 
-<!-- EDIT PROFILE -->
-<section class="page" id="edit-profile" hidden>
+      <p>Email address</p>
+      <strong id="accountEmail">Loading...</strong>
 
-  <div class="page-heading">
-    <p class="eyebrow">MAKE IT YOURS</p>
-    <h1>Edit profile</h1>
-    <p>Tell your people a little about yourself.</p>
-  </div>
+      <p>Display name</p>
+      <strong id="accountDisplayName">Loading...</strong>
+    </section>
 
-  <div class="settings-card">
+    <section class="settings-card">
+      <h3>Privacy 🔒</h3>
 
-    <!-- PROFILE PHOTO -->
-    <div class="edit-avatar-wrap">
-      <div class="profile-avatar" id="editAvatar">U</div>
-
-      <label class="upload-btn">
-        📷 Change profile photo
-        <input type="file" id="avatarInput" accept="image/*" hidden>
+      <label>
+        <input type="checkbox" id="privateAccount">
+        Make my account private
       </label>
-    </div>
 
-    <!-- COVER PHOTO -->
-    <div class="cover-edit-section">
-      <p class="field-label">Profile cover</p>
+      <p>
+        When your account is private, people must send you
+        a follow request before seeing your posts.
+      </p>
+    </section>
 
-      <div class="cover-preview" id="editCoverPreview">
-        Your LEAKA cover
+    <section class="settings-card">
+      <h3>Follow Requests</h3>
+      <p>Manage people who want to follow you.</p>
+
+      <div id="followRequestsList">
+        <p>No pending follow requests.</p>
       </div>
+    </section>
 
-      <label class="upload-btn">
-        🖼️ Change cover photo
-        <input type="file" id="coverInput" accept="image/*" hidden>
-      </label>
-    </div>
+    <section class="settings-card">
+      <h3>Account</h3>
+      <button id="settingsLogoutBtn">Log Out</button>
+    </section>
 
-    <!-- NAME -->
-    <label class="field-label" for="displayName">Display name</label>
-    <input
-      class="settings-input"
-      id="displayName"
-      maxlength="40"
-      placeholder="Your name"
-    >
-
-    <!-- BIO -->
-    <label class="field-label" for="bioInput">Bio</label>
-    <textarea
-      id="bioInput"
-      maxlength="160"
-      placeholder="Tell people about yourself..."
-    ></textarea>
-
-    <button class="primary-btn" id="saveProfileBtn">
-      Save changes
-    </button>
-
-    <p id="profileMessage" class="form-message"></p>
-
-  </div>
-</section>
-
-<!-- SETTINGS -->
-<section class="page" id="settings" hidden>
-  <div class="page-heading">
-    <p class="eyebrow">YOUR ACCOUNT</p>
-    <h1>Settings and privacy</h1>
-    <p>Make LEAKA yours.</p>
-  </div>
-
-  <div class="settings-group">
-    <h3>ACCOUNT</h3>
-
-    <button class="settings-row" data-page="edit-profile">
-      <span class="settings-icon">♙</span>
-      <span><strong>Edit profile</strong><small>Photo, cover, name and bio</small></span>
-      <b>›</b>
-    </button>
-
-    <button class="settings-row" data-page="account">
-      <span class="settings-icon">◎</span>
-      <span><strong>Account information</strong><small>Your account details & Log out</small></span>
-      <b>›</b>
-    </button>
-  </div>
-
-  <div class="settings-group">
-    <h3>PRIVACY AND SECURITY</h3>
-
-    <button class="settings-row" data-page="privacy">
-      <span class="settings-icon">♢</span>
-      <span><strong>Privacy</strong><small>Manage your privacy</small></span>
-      <b>›</b>
-    </button>
-
-    <button class="settings-row" data-page="security">
-      <span class="settings-icon">▣</span>
-      <span><strong>Security</strong><small>Protect your account</small></span>
-      <b>›</b>
-    </button>
-
-    <button class="settings-row" data-page="blocked">
-      <span class="settings-icon">⊘</span>
-      <span><strong>Blocked accounts</strong><small>Manage blocked users</small></span>
-      <b>›</b>
-    </button>
-  </div>
-
-  <div class="settings-group">
-    <h3>PREFERENCES</h3>
-
-    <button class="settings-row" data-page="notifications">
-      <span class="settings-icon">♧</span>
-      <span><strong>Notifications</strong><small>Manage your alerts</small></span>
-      <b>›</b>
-    </button>
-
-    <button class="settings-row" data-page="help">
-      <span class="settings-icon">?</span>
-      <span><strong>Help and support</strong><small>We're here to help</small></span>
-      <b>›</b>
-    </button>
-  </div>
-
-  <div class="settings-group" id="adminEntry" hidden>
-    <h3>ADMINISTRATION</h3>
-    <button class="settings-row" data-page="admin">
-      <span class="settings-icon">♛</span>
-      <span><strong>LEAKA Admin</strong><small>Platform management</small></span>
-      <b>›</b>
-    </button>
-  </div>
-
-  <p class="version-text">LEAKA · Your world. Your people.</p>
-</section>
-
-<!-- ACCOUNT -->
-<section class="page" id="account" hidden>
-  <div class="page-heading">
-    <h1>Account information</h1>
-    <p>Your account details.</p>
-  </div>
-
-  <div class="settings-card">
-    <p class="field-label">Email address</p>
-    <p id="accountEmail" class="account-value">Loading...</p>
-
-    <p class="field-label">Display name</p>
-    <p id="accountDisplayName" class="account-value">Loading...</p>
-
-    <button class="logout-settings" id="settingsLogoutBtn">Log out of LEAKA</button>
-  </div>
-</section>
-
-<!-- PRIVACY -->
-<section class="page" id="privacy" hidden>
-  <div class="page-heading">
-    <h1>Privacy</h1>
-    <p>More control over your space.</p>
-  </div>
-
-  <div class="settings-card">
-    <label class="settings-row">
-      <span>
-        <strong>Private account</strong>
-        <small>Future follow requests control</small>
-      </span>
-      <input type="checkbox" id="privateAccount">
-    </label>
-  </div>
-</section>
-
-<!-- SECURITY -->
-<section class="page" id="security" hidden>
-  <div class="page-heading">
-    <h1>Security</h1>
-    <p>Keep your account safe.</p>
-  </div>
-
-  <div class="settings-card">
-    <p>Your account is protected by Supabase authentication.</p>
-  </div>
-</section>
-
-<!-- BLOCKED -->
-<section class="page" id="blocked" hidden>
-  <div class="page-heading">
-    <h1>Blocked accounts</h1>
-    <p>Manage people you have blocked.</p>
-  </div>
-
-  <div class="settings-card" id="blockedList">
-    <p class="muted-note">You haven't blocked anyone yet.</p>
-  </div>
-</section>
-
-<!-- NOTIFICATIONS -->
-<section class="page" id="notifications" hidden>
-  <div class="page-heading">
-    <h1>Notifications</h1>
-    <p>Manage your alerts.</p>
-  </div>
-
-  <div class="settings-card">
-    <p>Notification preferences will be available here.</p>
-  </div>
-</section>
-
-<!-- HELP -->
-<section class="page" id="help" hidden>
-  <div class="page-heading">
-    <h1>Help and support</h1>
-    <p>We're here to help.</p>
-  </div>
-
-  <div class="settings-card">
-    <p>Thanks for being part of LEAKA 💜</p>
-  </div>
-</section>
-
-<!-- ADMIN -->
-<section class="page" id="admin" hidden>
-  <div class="page-heading">
-    <p class="eyebrow">LEAKA MANAGEMENT</p>
-    <h1>Admin dashboard ♛</h1>
-    <p>Founder and platform administration.</p>
-  </div>
-
-  <div class="settings-card">
-    <h3>Platform overview</h3>
-    <p id="adminStatus">Admin permissions will be verified securely.</p>
-
-    <div class="settings-group">
-      <h3>USER MANAGEMENT</h3>
-      <div id="adminUsers">
-        <p class="muted-note">User management will appear here.</p>
-      </div>
-    </div>
-
-    <div class="settings-group">
-      <h3>CONTENT MODERATION</h3>
-      <div id="adminReports">
-        <p class="muted-note">Reported content will appear here.</p>
-      </div>
-    </div>
-  </div>
-</section>
-
-</main>
-
-<!-- BOTTOM NAVIGATION -->
-<nav class="bottom-nav">
-
-  <button class="nav-item active" data-page="home">
-    <span>⌂</span>
-    <small>Home</small>
-  </button>
-
-  <button class="nav-item" data-page="reels">
-    <span>▷</span>
-    <small>Reels</small>
-  </button>
-
-  <button class="nav-item create-nav" data-page="home" data-scroll="create">
-    <span>＋</span>
-    <small>Create</small>
-  </button>
-
-  <button class="nav-item" data-page="messages">
-    <span>✉</span>
-    <small>Chats</small>
-  </button>
-
-  <button class="nav-item" data-page="profile">
-    <span>♙</span>
-    <small>Profile</small>
-  </button>
-
-</nav>
+  </main>
 
 </div>
 
-<footer>© 2026 LEAKA. Made for everyone. 💜</footer>
+<!-- ================= SCRIPTS ================= -->
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="app.js"></script>
