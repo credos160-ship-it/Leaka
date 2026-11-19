@@ -1,26 +1,28 @@
 
 /* =========================================
    LEAKA — COMPLETE SOCIAL APP
-   Supabase + Profiles + Following + Privacy
+   Supabase • Profiles • Posts • Likes
+   Comments • Following • Privacy • Stories
 ========================================= */
 
 const SUPABASE_URL = "https://kiwpmnvoqzrfwblnudjq.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable__oAt1RpObXR5PDqSG7yE1w_SkdZ0Hry";
 const BUCKET = "leaka-media";
 
-const { createClient } = supabase;
+const { createClient } = window.supabase;
 const db = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 let currentUser = null;
 let currentProfile = null;
 let selectedMedia = null;
+let searchTimer = null;
 let activePublicUser = null;
+
+const $ = id => document.getElementById(id);
 
 // =========================================
 // HELPERS
 // =========================================
-
-const $ = id => document.getElementById(id);
 
 function escapeHTML(value = "") {
   return String(value).replace(/[&<>"']/g, char => ({
@@ -32,18 +34,20 @@ function escapeHTML(value = "") {
   })[char]);
 }
 
-function avatarHTML(url, name = "U") {
-  return url
-    ? `<img src="${escapeHTML(url)}" alt="">`
-    : escapeHTML((name || "U").charAt(0).toUpperCase());
-}
-
 function profileName(profile) {
-  return profile?.display_name || profile?.username || "LEAKA User";
+  return profile?.display_name ||
+    profile?.username ||
+    "LEAKA User";
 }
 
 function username(profile) {
   return profile?.username || "user";
+}
+
+function avatarHTML(url, name = "U") {
+  return url
+    ? `<img src="${escapeHTML(url)}" alt="Profile picture">`
+    : escapeHTML((name || "U").charAt(0).toUpperCase());
 }
 
 function notify(message, error = false) {
@@ -56,322 +60,32 @@ function notify(message, error = false) {
   }
 
   box.textContent = message;
+
   box.style.cssText = `
     position:fixed;
-    bottom:100px;
+    bottom:95px;
     left:50%;
     transform:translateX(-50%);
-    background:${error ? "#8e3152" : "#7139bd"};
+    background:${error ? "#963c60" : "#7139bd"};
     color:white;
     padding:13px 22px;
     border-radius:30px;
-    z-index:99999;
-    box-shadow:0 8px 30px #0004;
+    z-index:999999;
+    box-shadow:0 8px 30px #0005;
     font-size:13px;
+    max-width:90%;
+    text-align:center;
   `;
 
   clearTimeout(window.leakaToastTimer);
-  window.leakaToastTimer = setTimeout(() => box.remove(), 2800);
+
+  window.leakaToastTimer = setTimeout(() => {
+    box.remove();
+  }, 3000);
 }
 
 // =========================================
-// STYLES FOR PUBLIC PROFILES
-// =========================================
-
-const profileStyles = document.createElement("style");
-
-profileStyles.textContent = `
-#publicProfileOverlay {
-  position:fixed;
-  inset:0;
-  z-index:9990;
-  background:rgba(15,10,23,.72);
-  backdrop-filter:blur(12px);
-  overflow-y:auto;
-  padding:25px 12px;
-}
-
-.public-profile-card {
-  width:min(100%,650px);
-  margin:15px auto;
-  background:#fdfaff;
-  color:#24172f;
-  border-radius:24px;
-  overflow:hidden;
-  box-shadow:0 25px 80px #0005;
-  animation:leakaProfileIn .25s ease;
-}
-
-@keyframes leakaProfileIn {
-  from {opacity:0;transform:translateY(18px)}
-  to {opacity:1;transform:translateY(0)}
-}
-
-.public-profile-cover {
-  height:190px;
-  position:relative;
-  background:linear-gradient(120deg,#b99af5,#8054c7,#e3b8ed);
-}
-
-.public-profile-cover img {
-  width:100%;
-  height:100%;
-  object-fit:cover;
-}
-
-.public-profile-close {
-  position:absolute;
-  top:14px;
-  right:14px;
-  width:38px;
-  height:38px;
-  border:0;
-  border-radius:50%;
-  background:#ffffffdd;
-  color:#493365;
-  font-size:23px;
-  cursor:pointer;
-}
-
-.public-profile-body {
-  padding:0 24px 25px;
-}
-
-.public-profile-top {
-  display:flex;
-  align-items:flex-end;
-  justify-content:space-between;
-  gap:12px;
-  margin-top:-48px;
-  position:relative;
-}
-
-.public-profile-avatar {
-  width:105px;
-  height:105px;
-  border:5px solid #fdfaff;
-  border-radius:50%;
-  background:linear-gradient(135deg,#bd9af4,#7749bf);
-  display:grid;
-  place-items:center;
-  overflow:hidden;
-  color:white;
-  font-size:32px;
-  font-weight:800;
-  flex-shrink:0;
-}
-
-.public-profile-avatar img {
-  width:100%;
-  height:100%;
-  object-fit:cover;
-}
-
-.public-profile-actions {
-  display:flex;
-  gap:9px;
-  padding-bottom:8px;
-}
-
-.public-follow-btn,
-.public-message-btn {
-  border:0;
-  border-radius:12px;
-  padding:11px 20px;
-  font-weight:700;
-  font-size:13px;
-  cursor:pointer;
-  transition:.2s;
-}
-
-.public-follow-btn {
-  background:linear-gradient(135deg,#9565e5,#713ac1);
-  color:white;
-  box-shadow:0 5px 15px #9565e544;
-}
-
-.public-follow-btn.following {
-  background:#eee7f7;
-  color:#603b91;
-  box-shadow:none;
-}
-
-.public-follow-btn:hover,
-.public-message-btn:hover {
-  transform:translateY(-2px);
-}
-
-.public-message-btn {
-  background:#f0e9f8;
-  color:#684397;
-}
-
-.public-profile-name {
-  margin-top:16px;
-  font-size:25px;
-  font-weight:800;
-  overflow-wrap:anywhere;
-}
-
-.public-profile-handle {
-  color:#947fa8;
-  font-size:13px;
-  margin-top:5px;
-}
-
-.public-profile-bio {
-  color:#574963;
-  font-size:14px;
-  line-height:1.7;
-  margin-top:15px;
-  overflow-wrap:anywhere;
-}
-
-.public-profile-stats {
-  display:flex;
-  gap:35px;
-  padding:22px 0;
-  margin-top:8px;
-  border-bottom:1px solid #eee5f5;
-}
-
-.public-profile-stats div {
-  display:flex;
-  flex-direction:column;
-  gap:4px;
-}
-
-.public-profile-stats strong {
-  font-size:20px;
-  color:#352344;
-}
-
-.public-profile-stats span {
-  font-size:11px;
-  color:#9b8ba8;
-}
-
-.public-profile-private {
-  padding:45px 15px;
-  text-align:center;
-  color:#846e99;
-}
-
-.public-profile-private strong {
-  display:block;
-  color:#49345e;
-  font-size:18px;
-  margin-bottom:8px;
-}
-
-.public-profile-posts {
-  display:grid;
-  grid-template-columns:repeat(3,minmax(0,1fr));
-  gap:5px;
-  padding-top:18px;
-}
-
-.public-profile-post {
-  aspect-ratio:1;
-  background:#eee7f6;
-  overflow:hidden;
-  cursor:pointer;
-}
-
-.public-profile-post img,
-.public-profile-post video {
-  width:100%;
-  height:100%;
-  object-fit:cover;
-}
-
-.public-profile-post-empty {
-  grid-column:1/-1;
-  padding:40px 10px;
-  text-align:center;
-  color:#9886a7;
-  font-size:13px;
-}
-
-.public-profile-tabs {
-  display:flex;
-  justify-content:space-around;
-  border-bottom:1px solid #eee5f5;
-  margin-top:12px;
-}
-
-.public-profile-tabs button {
-  flex:1;
-  padding:14px;
-  background:none;
-  border:0;
-  color:#9b8ba8;
-  font-weight:600;
-  cursor:pointer;
-}
-
-.public-profile-tabs button.selected {
-  color:#824ac4;
-  border-bottom:2px solid #824ac4;
-}
-
-.request-list-item {
-  display:flex;
-  align-items:center;
-  gap:12px;
-  padding:13px 0;
-  border-bottom:1px solid #eee5f5;
-}
-
-.request-list-item img,
-.request-list-item .request-avatar {
-  width:43px;
-  height:43px;
-  border-radius:50%;
-  object-fit:cover;
-  background:#a17ad4;
-}
-
-.request-list-item .request-info {
-  flex:1;
-  min-width:0;
-}
-
-.request-list-item small {
-  display:block;
-  color:#9584a3;
-  margin-top:4px;
-}
-
-.request-list-item button {
-  border:0;
-  border-radius:9px;
-  padding:9px 12px;
-  background:#8050c7;
-  color:white;
-  cursor:pointer;
-  margin-left:4px;
-}
-
-.request-list-item button.decline {
-  background:#eee7f5;
-  color:#654582;
-}
-
-@media(max-width:430px) {
-  .public-profile-cover {height:155px}
-  .public-profile-body {padding:0 16px 20px}
-  .public-profile-avatar {width:88px;height:88px}
-  .public-profile-name {font-size:22px}
-  .public-profile-stats {gap:25px}
-  .public-follow-btn,.public-message-btn {padding:10px 13px}
-}
-`;
-
-document.head.appendChild(profileStyles);
-
-// =========================================
-// AUTHENTICATION
+// PROFILE RETRIEVAL
 // =========================================
 
 async function getProfile(userId) {
@@ -382,6 +96,7 @@ async function getProfile(userId) {
     .maybeSingle();
 
   if (error) throw error;
+
   return data;
 }
 
@@ -389,10 +104,13 @@ async function ensureProfile(user) {
   let profile = await getProfile(user.id);
 
   if (!profile) {
+    const baseName = user.email.split("@")[0];
+
     const newProfile = {
       id: user.id,
-      username: user.email.split("@")[0].toLowerCase().replace(/[^a-z0-9_]/g, ""),
-      display_name: user.email.split("@")[0],
+      username: baseName.toLowerCase()
+        .replace(/[^a-z0-9_]/g, ""),
+      display_name: baseName,
       bio: "Welcome to my LEAKA space 💜"
     };
 
@@ -401,114 +119,160 @@ async function ensureProfile(user) {
       .upsert(newProfile);
 
     if (error) throw error;
+
     profile = await getProfile(user.id);
   }
 
   return profile;
 }
 
+// =========================================
+// AUTHENTICATION
+// =========================================
+
 async function startApp(user) {
+  if (!user) return;
+
   currentUser = user;
 
   try {
     currentProfile = await ensureProfile(user);
   } catch (error) {
-    console.error("Profile error:", error);
-    notify("Could not load your profile.", true);
+    console.error(error);
+    notify("Profile loading error: " + error.message, true);
   }
 
-  $("auth").hidden = true;
-  $("appContent").hidden = false;
+  if ($("auth")) $("auth").hidden = true;
+  if ($("appContent")) $("appContent").hidden = false;
 
   await updateMyProfileUI();
   await loadPosts();
   await loadSearch();
   await loadAccountDetails();
+  await loadPrivacySetting();
+
+  const requests = $("followRequestsList");
+
+  if (requests) {
+    await renderFollowRequests(requests);
+  }
 }
 
 async function checkSession() {
   const { data, error } = await db.auth.getSession();
 
-  if (error) console.error(error);
+  if (error) {
+    console.error(error);
+    notify(error.message, true);
+  }
 
   if (data.session?.user) {
     await startApp(data.session.user);
   } else {
-    $("auth").hidden = false;
-    $("appContent").hidden = true;
+    if ($("auth")) $("auth").hidden = false;
+    if ($("appContent")) $("appContent").hidden = true;
   }
 }
 
+// SIGN UP
+
 $("signupBtn")?.addEventListener("click", async () => {
-  const email = $("email").value.trim();
-  const password = $("password").value;
+  const email = $("email")?.value.trim();
+  const password = $("password")?.value;
 
   if (!email || !password) {
-    $("authMessage").textContent = "Enter your email and password.";
+    $("authMessage").textContent =
+      "Enter your email and password.";
     return;
   }
 
   if (password.length < 6) {
-    $("authMessage").textContent = "Password must be at least 6 characters.";
+    $("authMessage").textContent =
+      "Password must be at least 6 characters.";
     return;
   }
 
+  $("signupBtn").disabled = true;
   $("authMessage").textContent = "Creating your account...";
 
-  const { error } = await db.auth.signUp({
-    email,
-    password,
-    options: {
-      emailRedirectTo: "https://credos160-ship-it.github.io/Leaka/"
-    }
-  });
+  try {
+    const { error } = await db.auth.signUp({
+      email,
+      password,
+      options: {
+        emailRedirectTo:
+          "https://credos160-ship-it.github.io/Leaka/"
+      }
+    });
 
-  if (error) {
-    $("authMessage").textContent = error.message;
-  } else {
+    if (error) throw error;
+
     $("authMessage").textContent =
-      "Account created! Check your email if confirmation is enabled.";
+      "Account created! Check your email for confirmation.";
+  } catch (error) {
+    $("authMessage").textContent = error.message;
+  } finally {
+    $("signupBtn").disabled = false;
   }
 });
 
+// LOGIN
+
 $("loginBtn")?.addEventListener("click", async () => {
-  const email = $("email").value.trim();
-  const password = $("password").value;
+  const email = $("email")?.value.trim();
+  const password = $("password")?.value;
 
   if (!email || !password) {
-    $("authMessage").textContent = "Enter your email and password.";
+    $("authMessage").textContent =
+      "Enter your email and password.";
     return;
   }
 
+  $("loginBtn").disabled = true;
   $("authMessage").textContent = "Logging in...";
 
-  const { data, error } = await db.auth.signInWithPassword({
-    email,
-    password
-  });
+  try {
+    const { data, error } = await db.auth.signInWithPassword({
+      email,
+      password
+    });
 
-  if (error) {
-    $("authMessage").textContent = error.message;
-  } else {
+    if (error) throw error;
+
     await startApp(data.user);
+
+  } catch (error) {
+    $("authMessage").textContent = error.message;
+  } finally {
+    $("loginBtn").disabled = false;
   }
 });
 
+// LOGOUT
+
 async function logout() {
-  await db.auth.signOut();
+  const { error } = await db.auth.signOut();
+
+  if (error) {
+    notify(error.message, true);
+    return;
+  }
+
   currentUser = null;
   currentProfile = null;
+
   location.reload();
 }
 
 $("logoutBtn")?.addEventListener("click", logout);
 $("settingsLogoutBtn")?.addEventListener("click", logout);
 
-db.auth.onAuthStateChange((event, session) => {
+db.auth.onAuthStateChange((event) => {
   if (event === "SIGNED_OUT") {
     currentUser = null;
-    $("auth").hidden = false;
-    $("appContent").hidden = true;
+
+    if ($("auth")) $("auth").hidden = false;
+    if ($("appContent")) $("appContent").hidden = true;
   }
 });
 
@@ -517,23 +281,41 @@ db.auth.onAuthStateChange((event, session) => {
 // =========================================
 
 function showPage(pageId) {
-  document.querySelectorAll(".page").forEach(page => {
+  const pages = document.querySelectorAll(
+    "#appContent main.page"
+  );
+
+  pages.forEach(page => {
     const active = page.id === pageId;
+
     page.hidden = !active;
     page.classList.toggle("active", active);
   });
 
-  document.querySelectorAll(".nav-item").forEach(button => {
+  document.querySelectorAll("[data-page]").forEach(button => {
     button.classList.toggle(
       "active",
       button.dataset.page === pageId
     );
   });
 
-  window.scrollTo({ top: 0, behavior: "smooth" });
+  window.scrollTo({
+    top: 0,
+    behavior: "smooth"
+  });
 
-  if (pageId === "profile") updateMyProfileUI();
-  if (pageId === "settings") loadAccountDetails();
+  if (pageId === "profile") {
+    updateMyProfileUI();
+  }
+
+  if (pageId === "settings") {
+    loadAccountDetails();
+    loadPrivacySetting();
+
+    if ($("followRequestsList")) {
+      renderFollowRequests($("followRequestsList"));
+    }
+  }
 }
 
 document.addEventListener("click", event => {
@@ -541,145 +323,15 @@ document.addEventListener("click", event => {
 
   if (!button) return;
 
-  const page = button.dataset.page;
-  showPage(page);
-
-  if (button.dataset.scroll) {
-    setTimeout(() => {
-      $(button.dataset.scroll)?.scrollIntoView({
-        behavior: "smooth"
-      });
-    }, 200);
-  }
+  showPage(button.dataset.page);
 });
 
-$("profileBtn")?.addEventListener("click", () => showPage("profile"));
-$("settingsGear")?.addEventListener("click", () => showPage("settings"));
-
-// =========================================
-// MY PROFILE
-// =========================================
-
-function localProfile() {
-  if (!currentUser) return {};
-
-  try {
-    return JSON.parse(
-      localStorage.getItem("leaka_profile_" + currentUser.id) || "{}"
-    );
-  } catch {
-    return {};
-  }
-}
-
-async function updateMyProfileUI() {
-  if (!currentUser) return;
-
-  const profile = currentProfile || {};
-  const local = localProfile();
-
-  const name = profile.display_name || local.name || currentUser.email.split("@")[0];
-  const avatar = profile.avatar_url || local.avatar || "";
-  const cover = local.cover || "";
-
-  $("profileName").textContent = name;
-  $("profileEmail").textContent = "@" + username(profile);
-  $("profileBio").textContent = profile.bio || local.bio || "Welcome to my LEAKA space 💜";
-
-  $("profileAvatar").innerHTML = avatarHTML(avatar, name);
-  $("editAvatar").innerHTML = avatarHTML(avatar, name);
-
-  const topAvatar = $("profileBtn");
-  if (topAvatar) topAvatar.innerHTML = avatarHTML(avatar, name);
-
-  if (cover) {
-    $("profileCoverImage").src = cover;
-    $("profileCoverImage").hidden = false;
-  } else {
-    $("profileCoverImage").hidden = true;
-  }
-
-  $("displayName").value = name;
-  $("bioInput").value = profile.bio || local.bio || "";
-
-  await loadMyCounts();
-  await loadMyPosts();
-}
-
-async function loadAccountDetails() {
-  if (!currentUser) return;
-
-  $("accountEmail").textContent = currentUser.email;
-
-  $("accountDisplayName").textContent =
-    currentProfile?.display_name || "Not set";
-}
-
-$("avatarInput")?.addEventListener("change", async event => {
-  const file = event.target.files[0];
-  if (!file) return;
-
-  const url = await uploadMedia(file, "avatars");
-
-  if (!url) return;
-
-  const { error } = await db
-    .from("profiles")
-    .update({ avatar_url: url })
-    .eq("id", currentUser.id);
-
-  if (error) return notify(error.message, true);
-
-  currentProfile.avatar_url = url;
-  await updateMyProfileUI();
-  notify("Profile photo updated 💜");
+$("profileBtn")?.addEventListener("click", () => {
+  showPage("profile");
 });
 
-$("coverInput")?.addEventListener("change", async event => {
-  const file = event.target.files[0];
-  if (!file) return;
-
-  const url = await uploadMedia(file, "covers");
-  if (!url) return;
-
-  const local = localProfile();
-  local.cover = url;
-
-  localStorage.setItem(
-    "leaka_profile_" + currentUser.id,
-    JSON.stringify(local)
-  );
-
-  $("editCoverPreview").innerHTML =
-    `<img src="${escapeHTML(url)}" alt="">`;
-
-  await updateMyProfileUI();
-  notify("Cover photo updated!");
-});
-
-$("saveProfileBtn")?.addEventListener("click", async () => {
-  const name = $("displayName").value.trim();
-  const bio = $("bioInput").value.trim();
-
-  if (!name) return notify("Enter your display name.", true);
-
-  const { data, error } = await db
-    .from("profiles")
-    .update({
-      display_name: name,
-      bio
-    })
-    .eq("id", currentUser.id)
-    .select()
-    .single();
-
-  if (error) return notify(error.message, true);
-
-  currentProfile = data;
-  await updateMyProfileUI();
-
-  $("profileMessage").textContent = "Profile saved successfully 💜";
-  notify("Profile updated!");
+$("settingsGear")?.addEventListener("click", () => {
+  showPage("settings");
 });
 
 // =========================================
@@ -687,15 +339,23 @@ $("saveProfileBtn")?.addEventListener("click", async () => {
 // =========================================
 
 async function uploadMedia(file, folder = "posts") {
-  if (!currentUser) return null;
+  if (!currentUser || !file) return null;
 
-  const extension = file.name.split(".").pop();
-  const path = `${folder}/${currentUser.id}/${Date.now()}.${extension}`;
+  if (file.size > 25 * 1024 * 1024) {
+    notify("File is too large. Maximum size is 25MB.", true);
+    return null;
+  }
+
+  const extension =
+    file.name.split(".").pop().toLowerCase();
+
+  const path =
+    `${folder}/${currentUser.id}/${Date.now()}.${extension}`;
 
   const { error } = await db.storage
     .from(BUCKET)
     .upload(path, file, {
-      upsert: true,
+      upsert: false,
       contentType: file.type
     });
 
@@ -713,29 +373,251 @@ async function uploadMedia(file, folder = "posts") {
 }
 
 // =========================================
-// POSTS
+// PROFILE
+// =========================================
+
+function localProfile() {
+  if (!currentUser) return {};
+
+  try {
+    return JSON.parse(
+      localStorage.getItem(
+        "leaka_profile_" + currentUser.id
+      ) || "{}"
+    );
+  } catch {
+    return {};
+  }
+}
+
+async function updateMyProfileUI() {
+  if (!currentUser) return;
+
+  const profile = currentProfile || {};
+  const local = localProfile();
+
+  const name =
+    profile.display_name ||
+    local.name ||
+    currentUser.email.split("@")[0];
+
+  const avatar =
+    profile.avatar_url ||
+    local.avatar ||
+    "";
+
+  const cover = local.cover || "";
+
+  if ($("profileName")) {
+    $("profileName").textContent = name;
+  }
+
+  if ($("profileEmail")) {
+    $("profileEmail").textContent =
+      "@" + username(profile);
+  }
+
+  if ($("profileBio")) {
+    $("profileBio").textContent =
+      profile.bio || local.bio ||
+      "Welcome to my LEAKA space 💜";
+  }
+
+  if ($("profileAvatar")) {
+    $("profileAvatar").innerHTML =
+      avatarHTML(avatar, name);
+  }
+
+  if ($("editAvatar")) {
+    $("editAvatar").innerHTML =
+      avatarHTML(avatar, name);
+  }
+
+  if ($("profileBtn")) {
+    $("profileBtn").innerHTML =
+      avatarHTML(avatar, name);
+  }
+
+  if ($("profileCoverImage")) {
+    if (cover) {
+      $("profileCoverImage").src = cover;
+      $("profileCoverImage").hidden = false;
+    } else {
+      $("profileCoverImage").hidden = true;
+    }
+  }
+
+  if ($("displayName")) {
+    $("displayName").value = name;
+  }
+
+  if ($("bioInput")) {
+    $("bioInput").value =
+      profile.bio || local.bio || "";
+  }
+
+  if (cover && $("editCoverPreview")) {
+    $("editCoverPreview").innerHTML =
+      `<img src="${escapeHTML(cover)}" alt="Cover preview">`;
+  }
+
+  await loadMyPosts();
+}
+
+async function loadAccountDetails() {
+  if (!currentUser) return;
+
+  if ($("accountEmail")) {
+    $("accountEmail").textContent =
+      currentUser.email;
+  }
+
+  if ($("accountDisplayName")) {
+    $("accountDisplayName").textContent =
+      currentProfile?.display_name || "Not set";
+  }
+}
+
+// PROFILE PICTURE
+
+$("avatarInput")?.addEventListener("change", async event => {
+  const file = event.target.files[0];
+
+  if (!file) return;
+
+  if (!file.type.startsWith("image/")) {
+    notify("Choose an image.", true);
+    return;
+  }
+
+  const url = await uploadMedia(file, "avatars");
+
+  if (!url) return;
+
+  const { error } = await db
+    .from("profiles")
+    .update({ avatar_url: url })
+    .eq("id", currentUser.id);
+
+  if (error) {
+    notify(error.message, true);
+    return;
+  }
+
+  currentProfile.avatar_url = url;
+
+  await updateMyProfileUI();
+
+  notify("Profile picture updated 💜");
+});
+
+// COVER PHOTO
+
+$("coverInput")?.addEventListener("change", async event => {
+  const file = event.target.files[0];
+
+  if (!file) return;
+
+  if (!file.type.startsWith("image/")) {
+    notify("Choose an image.", true);
+    return;
+  }
+
+  const url = await uploadMedia(file, "covers");
+
+  if (!url) return;
+
+  const local = localProfile();
+  local.cover = url;
+
+  localStorage.setItem(
+    "leaka_profile_" + currentUser.id,
+    JSON.stringify(local)
+  );
+
+  await updateMyProfileUI();
+
+  notify("Cover photo updated 💜");
+});
+
+// SAVE PROFILE
+
+$("saveProfileBtn")?.addEventListener("click", async () => {
+  const name = $("displayName")?.value.trim();
+  const bio = $("bioInput")?.value.trim();
+
+  if (!name) {
+    notify("Enter your display name.", true);
+    return;
+  }
+
+  $("saveProfileBtn").disabled = true;
+
+  try {
+    const { data, error } = await db
+      .from("profiles")
+      .update({
+        display_name: name,
+        bio
+      })
+      .eq("id", currentUser.id)
+      .select()
+      .single();
+
+    if (error) throw error;
+
+    currentProfile = data;
+
+    await updateMyProfileUI();
+    await loadAccountDetails();
+
+    notify("Profile updated successfully 💜");
+
+  } catch (error) {
+    notify(error.message, true);
+  } finally {
+    $("saveProfileBtn").disabled = false;
+  }
+});
+
+// =========================================
+// CREATE POSTS
 // =========================================
 
 $("mediaInput")?.addEventListener("change", event => {
   selectedMedia = event.target.files[0] || null;
 
-  if (!selectedMedia) return;
+  if (!selectedMedia) {
+    $("preview").innerHTML = "";
+    return;
+  }
+
+  if (selectedMedia.size > 25 * 1024 * 1024) {
+    notify("Maximum file size is 25MB.", true);
+    event.target.value = "";
+    selectedMedia = null;
+    $("preview").innerHTML = "";
+    return;
+  }
 
   const url = URL.createObjectURL(selectedMedia);
-  const isVideo = selectedMedia.type.startsWith("video/");
 
-  $("preview").innerHTML = isVideo
-    ? `<video src="${url}" controls></video>`
-    : `<img src="${url}" alt="Preview">`;
+  $("preview").innerHTML =
+    selectedMedia.type.startsWith("video/")
+      ? `<video src="${url}" controls playsinline></video>`
+      : `<img src="${url}" alt="Post preview">`;
 });
+
+// PUBLISH POST
 
 $("postBtn")?.addEventListener("click", async () => {
   if (!currentUser) return;
 
-  const caption = $("caption").value.trim();
+  const caption = $("caption")?.value.trim();
 
   if (!caption && !selectedMedia) {
-    return notify("Write something or add media.", true);
+    notify("Write something or add a photo/video.", true);
+    return;
   }
 
   $("postBtn").disabled = true;
@@ -746,28 +628,34 @@ $("postBtn")?.addEventListener("click", async () => {
     let mediaType = null;
 
     if (selectedMedia) {
-      mediaUrl = await uploadMedia(selectedMedia);
+      mediaUrl = await uploadMedia(selectedMedia, "posts");
+
       if (!mediaUrl) return;
+
       mediaType = selectedMedia.type.startsWith("video/")
         ? "video"
         : "image";
     }
 
-    const { error } = await db.from("posts").insert({
-      user_id: currentUser.id,
-      caption,
-      media_url: mediaUrl,
-      media_type: mediaType
-    });
+    const { error } = await db
+      .from("posts")
+      .insert({
+        user_id: currentUser.id,
+        caption,
+        media_url: mediaUrl,
+        media_type: mediaType
+      });
 
     if (error) throw error;
 
     $("caption").value = "";
     $("mediaInput").value = "";
     $("preview").innerHTML = "";
+
     selectedMedia = null;
 
     notify("Your post is live! ✨");
+
     await loadPosts();
     await loadMyPosts();
 
@@ -779,8 +667,13 @@ $("postBtn")?.addEventListener("click", async () => {
   }
 });
 
+// =========================================
+// LOAD FEED
+// =========================================
+
 async function loadPosts() {
   const container = $("posts");
+
   if (!container || !currentUser) return;
 
   const { data, error } = await db
@@ -790,6 +683,8 @@ async function loadPosts() {
 
   if (error) {
     console.error(error);
+    container.innerHTML =
+      `<p class="muted">Could not load posts.</p>`;
     return;
   }
 
@@ -806,14 +701,18 @@ async function loadPosts() {
   container.innerHTML = "";
 
   for (const post of data) {
-    const profile = await getProfile(post.user_id).catch(() => null);
+    const profile = await getProfile(post.user_id)
+      .catch(() => null);
 
     const { data: likes } = await db
       .from("likes")
       .select("user_id")
       .eq("post_id", post.id);
 
-    const liked = likes?.some(like => like.user_id === currentUser.id);
+    const liked = likes?.some(
+      like => like.user_id === currentUser.id
+    );
+
     const count = likes?.length || 0;
 
     const card = document.createElement("article");
@@ -822,42 +721,76 @@ async function loadPosts() {
     card.innerHTML = `
       <div class="post-header">
         <div class="post-avatar">
-          ${avatarHTML(profile?.avatar_url, profileName(profile))}
+          ${avatarHTML(
+            profile?.avatar_url,
+            profileName(profile)
+          )}
         </div>
+
         <div>
-          <div class="post-user">${escapeHTML(profileName(profile))}</div>
-          <div class="post-time">@${escapeHTML(username(profile))}</div>
+          <div class="post-user">
+            ${escapeHTML(profileName(profile))}
+          </div>
+          <div class="post-time">
+            @${escapeHTML(username(profile))}
+          </div>
         </div>
       </div>
 
-      ${post.caption ? `<p class="post-caption">${escapeHTML(post.caption)}</p>` : ""}
+      ${
+        post.caption
+          ? `<p class="post-caption">${escapeHTML(post.caption)}</p>`
+          : ""
+      }
 
-      ${post.media_url ? (
-        post.media_type === "video"
-          ? `<video class="post-media" src="${escapeHTML(post.media_url)}" controls playsinline></video>`
-          : `<img class="post-media" src="${escapeHTML(post.media_url)}" alt="Post">`
-      ) : ""}
+      ${
+        post.media_url
+          ? post.media_type === "video"
+            ? `<video class="post-media"
+                 src="${escapeHTML(post.media_url)}"
+                 controls playsinline></video>`
+            : `<img class="post-media"
+                 src="${escapeHTML(post.media_url)}"
+                 alt="Post">`
+          : ""
+      }
 
       <div class="post-actions">
-        <button class="action-btn ${liked ? "liked" : ""}" data-like="${post.id}">
+        <button class="action-btn ${liked ? "liked" : ""}"
+          data-like="${escapeHTML(post.id)}">
           ${liked ? "♥" : "♡"} ${count} Likes
         </button>
-        <button class="action-btn" data-comment-focus="${post.id}">
+
+        <button class="action-btn"
+          data-comment-focus="${escapeHTML(post.id)}">
           ♧ Comment
         </button>
-        ${post.user_id === currentUser.id
-          ? `<button class="action-btn" data-delete-post="${post.id}">Delete</button>`
-          : ""}
+
+        ${
+          post.user_id === currentUser.id
+            ? `<button class="action-btn"
+                 data-delete-post="${escapeHTML(post.id)}">
+                 Delete
+               </button>`
+            : ""
+        }
       </div>
 
       <div class="comment-area">
-        <input id="comment-${post.id}" placeholder="Write a comment...">
-        <button data-comment="${post.id}">Send</button>
+        <input id="comment-${escapeHTML(post.id)}"
+          placeholder="Write a comment...">
+
+        <button data-comment="${escapeHTML(post.id)}">
+          Send
+        </button>
       </div>
-      <div class="comments" id="comments-${post.id}"></div>
+
+      <div class="comments"
+        id="comments-${escapeHTML(post.id)}"></div>
     `;
 
     container.appendChild(card);
+
     loadComments(post.id);
   }
 }
@@ -868,30 +801,46 @@ async function loadPosts() {
 
 document.addEventListener("click", async event => {
   const button = event.target.closest("[data-like]");
+
   if (!button || !currentUser) return;
 
   const postId = button.dataset.like;
 
-  const { data: existing } = await db
-    .from("likes")
-    .select("id")
-    .eq("post_id", postId)
-    .eq("user_id", currentUser.id)
-    .maybeSingle();
+  button.disabled = true;
 
-  if (existing) {
-    await db.from("likes").delete().eq("id", existing.id);
-  } else {
-    const { error } = await db.from("likes").insert({
-      post_id: postId,
-      user_id: currentUser.id
-    });
+  try {
+    const { data: existing } = await db
+      .from("likes")
+      .select("id")
+      .eq("post_id", postId)
+      .eq("user_id", currentUser.id)
+      .maybeSingle();
 
-    if (error) return notify(error.message, true);
+    if (existing) {
+      const { error } = await db
+        .from("likes")
+        .delete()
+        .eq("id", existing.id);
+
+      if (error) throw error;
+
+    } else {
+      const { error } = await db
+        .from("likes")
+        .insert({
+          post_id: postId,
+          user_id: currentUser.id
+        });
+
+      if (error) throw error;
+    }
+
+    await loadPosts();
+    await loadMyPosts();
+
+  } catch (error) {
+    notify(error.message, true);
   }
-
-  await loadPosts();
-  await loadMyPosts();
 });
 
 // =========================================
@@ -908,43 +857,65 @@ async function loadComments(postId) {
   if (error) return;
 
   const container = $("comments-" + postId);
+
   if (!container) return;
 
   container.innerHTML = "";
 
   for (const comment of data || []) {
-    const profile = await getProfile(comment.user_id).catch(() => null);
+    const profile = await getProfile(comment.user_id)
+      .catch(() => null);
 
     const p = document.createElement("p");
-    p.innerHTML = `<strong>${escapeHTML(profileName(profile))}:</strong> ${escapeHTML(comment.content || comment.comment || "")}`;
+
+    p.innerHTML = `
+      <strong>${escapeHTML(profileName(profile))}:</strong>
+      ${escapeHTML(comment.content || comment.comment || "")}
+    `;
+
     container.appendChild(p);
   }
 }
 
 document.addEventListener("click", async event => {
   const button = event.target.closest("[data-comment]");
+
   if (!button || !currentUser) return;
 
   const postId = button.dataset.comment;
   const input = $("comment-" + postId);
-  const content = input.value.trim();
+
+  const content = input?.value.trim();
 
   if (!content) return;
 
-  const { error } = await db.from("comments").insert({
-    post_id: postId,
-    user_id: currentUser.id,
-    content
-  });
+  button.disabled = true;
 
-  if (error) return notify(error.message, true);
+  try {
+    const { error } = await db
+      .from("comments")
+      .insert({
+        post_id: postId,
+        user_id: currentUser.id,
+        content
+      });
 
-  input.value = "";
-  await loadComments(postId);
+    if (error) throw error;
+
+    input.value = "";
+
+    await loadComments(postId);
+
+  } catch (error) {
+    notify(error.message, true);
+  } finally {
+    button.disabled = false;
+  }
 });
 
 document.addEventListener("click", event => {
   const button = event.target.closest("[data-comment-focus]");
+
   if (!button) return;
 
   $("comment-" + button.dataset.commentFocus)?.focus();
@@ -956,9 +927,12 @@ document.addEventListener("click", event => {
 
 document.addEventListener("click", async event => {
   const button = event.target.closest("[data-delete-post]");
-  if (!button) return;
 
-  if (!confirm("Delete this post?")) return;
+  if (!button || !currentUser) return;
+
+  if (!confirm("Are you sure you want to delete this post?")) {
+    return;
+  }
 
   const { error } = await db
     .from("posts")
@@ -966,15 +940,19 @@ document.addEventListener("click", async event => {
     .eq("id", button.dataset.deletePost)
     .eq("user_id", currentUser.id);
 
-  if (error) return notify(error.message, true);
+  if (error) {
+    notify(error.message, true);
+    return;
+  }
 
   notify("Post deleted.");
+
   await loadPosts();
   await loadMyPosts();
 });
 
 // =========================================
-// MY PROFILE POSTS AND COUNTS
+// MY PROFILE POSTS
 // =========================================
 
 async function loadMyPosts() {
@@ -986,25 +964,40 @@ async function loadMyPosts() {
     .eq("user_id", currentUser.id)
     .order("created_at", { ascending: false });
 
-  if (error) return;
+  if (error) {
+    console.error(error);
+    return;
+  }
 
-  $("postCount").textContent = data.length;
+  if ($("postCount")) {
+    $("postCount").textContent = data.length;
+  }
 
-  $("profilePosts").innerHTML = data.length
-    ? data.map(post => `
-        <div class="public-profile-post">
-          ${post.media_url
-            ? post.media_type === "video"
-              ? `<video src="${escapeHTML(post.media_url)}"></video>`
-              : `<img src="${escapeHTML(post.media_url)}" alt="">`
-            : `<div>${escapeHTML(post.caption)}</div>`}
-        </div>
-      `).join("")
-    : `<div class="empty-state">
-         <div>✦</div>
-         <h3>Your story starts here</h3>
-         <p>Your shared moments will appear here.</p>
-       </div>`;
+  const container = $("profilePosts");
+
+  if (container) {
+    container.innerHTML = data.length
+      ? data.map(post => `
+          <div class="public-profile-post">
+            ${
+              post.media_url
+                ? post.media_type === "video"
+                  ? `<video src="${escapeHTML(post.media_url)}"
+                       muted playsinline></video>`
+                  : `<img src="${escapeHTML(post.media_url)}"
+                       alt="Post">`
+                : `<div>${escapeHTML(post.caption)}</div>`
+            }
+          </div>
+        `).join("")
+      : `
+          <div class="empty-state">
+            <div>✦</div>
+            <h3>Your story starts here</h3>
+            <p>Your posts will appear here.</p>
+          </div>
+        `;
+  }
 
   await loadMyCounts();
 }
@@ -1022,25 +1015,23 @@ async function loadMyCounts() {
     .select("*", { count: "exact", head: true })
     .eq("follower_id", currentUser.id);
 
-  $("followerCount").textContent = followers || 0;
-  $("followingCount").textContent = following || 0;
+  if ($("followerCount")) {
+    $("followerCount").textContent = followers || 0;
+  }
+
+  if ($("followingCount")) {
+    $("followingCount").textContent = following || 0;
+  }
 }
 
 // =========================================
-// SEARCH USERS
+// SEARCH
 // =========================================
-
-let searchTimer;
 
 async function loadSearch() {
   const input = $("search");
-  if (!input) return;
 
-  input.setAttribute("autocomplete", "off");
-  input.setAttribute("autocorrect", "off");
-  input.setAttribute("autocapitalize", "none");
-  input.setAttribute("spellcheck", "false");
-  input.setAttribute("name", "leaka-user-search");
+  if (!input) return;
 
   input.addEventListener("input", () => {
     clearTimeout(searchTimer);
@@ -1052,17 +1043,27 @@ async function loadSearch() {
       return;
     }
 
-    searchTimer = setTimeout(() => searchUsers(query), 350);
+    searchTimer = setTimeout(() => {
+      searchUsers(query);
+    }, 350);
   });
 }
 
 async function searchUsers(query) {
+  if (!currentUser) return;
+
   const results = $("searchResults");
+
+  if (!results) return;
+
+  const safeQuery = query.replace(/[,%()]/g, " ");
 
   const { data, error } = await db
     .from("profiles")
     .select("id,username,display_name,avatar_url,is_private")
-    .or(`username.ilike.%${query}%,display_name.ilike.%${query}%`)
+    .or(
+      `username.ilike.%${safeQuery}%,display_name.ilike.%${safeQuery}%`
+    )
     .limit(15);
 
   if (error) {
@@ -1072,22 +1073,31 @@ async function searchUsers(query) {
 
   results.innerHTML = "";
 
-  if (!data.length) {
+  const people = (data || []).filter(
+    profile => profile.id !== currentUser.id
+  );
+
+  if (!people.length) {
     results.innerHTML = `
-      <div class="search-user">
+      <div class="empty-state">
         No people found.
       </div>`;
     return;
   }
 
-  data.filter(profile => profile.id !== currentUser.id).forEach(profile => {
+  people.forEach(profile => {
     const item = document.createElement("div");
+
     item.className = "search-user";
 
     item.innerHTML = `
       <div class="search-user-avatar">
-        ${avatarHTML(profile.avatar_url, profileName(profile))}
+        ${avatarHTML(
+          profile.avatar_url,
+          profileName(profile)
+        )}
       </div>
+
       <div>
         <strong>${escapeHTML(profileName(profile))}</strong>
         <span>@${escapeHTML(username(profile))}</span>
@@ -1096,7 +1106,7 @@ async function searchUsers(query) {
 
     item.addEventListener("click", () => {
       results.innerHTML = "";
-      $("search").blur();
+      inputBlur();
       openPublicProfile(profile.id);
     });
 
@@ -1104,8 +1114,12 @@ async function searchUsers(query) {
   });
 }
 
+function inputBlur() {
+  $("search")?.blur();
+}
+
 // =========================================
-// PUBLIC PROFILE SYSTEM
+// PUBLIC PROFILES
 // =========================================
 
 function createProfileOverlay() {
@@ -1115,10 +1129,13 @@ function createProfileOverlay() {
     overlay = document.createElement("div");
     overlay.id = "publicProfileOverlay";
     overlay.hidden = true;
+
     document.body.appendChild(overlay);
 
     overlay.addEventListener("click", event => {
-      if (event.target === overlay) closePublicProfile();
+      if (event.target === overlay) {
+        closePublicProfile();
+      }
     });
   }
 
@@ -1127,7 +1144,9 @@ function createProfileOverlay() {
 
 function closePublicProfile() {
   const overlay = $("publicProfileOverlay");
+
   if (overlay) overlay.hidden = true;
+
   activePublicUser = null;
 }
 
@@ -1140,14 +1159,20 @@ async function openPublicProfile(userId) {
   }
 
   const overlay = createProfileOverlay();
+
   overlay.hidden = false;
+
   overlay.innerHTML = `
     <div class="public-profile-card">
       <div class="public-profile-cover">
-        <button class="public-profile-close" onclick="closePublicProfile()">×</button>
+        <button class="public-profile-close"
+          onclick="closePublicProfile()">×</button>
       </div>
+
       <div class="public-profile-body">
-        <p style="padding:30px;text-align:center">Loading profile...</p>
+        <p style="padding:30px;text-align:center">
+          Loading profile...
+        </p>
       </div>
     </div>
   `;
@@ -1157,11 +1182,13 @@ async function openPublicProfile(userId) {
   if (!profile) {
     overlay.innerHTML = `
       <div class="public-profile-card">
-        <button class="public-profile-close" onclick="closePublicProfile()">×</button>
         <div class="public-profile-body">
-          <p class="public-profile-private">This profile could not be found.</p>
+          <button class="public-profile-close"
+            onclick="closePublicProfile()">×</button>
+          <p>This profile could not be found.</p>
         </div>
-      </div>`;
+      </div>
+    `;
     return;
   }
 
@@ -1169,7 +1196,9 @@ async function openPublicProfile(userId) {
 
   const local = (() => {
     try {
-      return JSON.parse(localStorage.getItem("leaka_profile_" + userId) || "{}");
+      return JSON.parse(
+        localStorage.getItem("leaka_profile_" + userId) || "{}"
+      );
     } catch {
       return {};
     }
@@ -1207,72 +1236,103 @@ async function openPublicProfile(userId) {
   const canSeePosts = !isPrivate || isFollowing;
 
   const cover = local.cover || "";
-  const avatar = profile.avatar_url || local.avatar || "";
+  const avatar = profile.avatar_url || "";
 
   overlay.innerHTML = `
     <div class="public-profile-card">
 
       <div class="public-profile-cover">
         ${cover ? `<img src="${escapeHTML(cover)}" alt="">` : ""}
-        <button class="public-profile-close" onclick="closePublicProfile()">×</button>
+
+        <button class="public-profile-close"
+          onclick="closePublicProfile()">×</button>
       </div>
 
       <div class="public-profile-body">
 
         <div class="public-profile-top">
+
           <div class="public-profile-avatar">
             ${avatarHTML(avatar, profileName(profile))}
           </div>
 
           <div class="public-profile-actions">
-            <button
-              class="public-follow-btn ${isFollowing ? "following" : ""}"
-              id="publicFollowBtn"
-              data-target-user="${userId}">
-              ${isFollowing ? "✓ Following" : isPending ? "Requested" : "Follow"}
+
+            <button class="public-follow-btn
+              ${isFollowing ? "following" : ""}"
+              id="publicFollowBtn">
+
+              ${
+                isFollowing
+                  ? "✓ Following"
+                  : isPending
+                    ? "Requested"
+                    : "Follow"
+              }
+
             </button>
-            <button class="public-message-btn" onclick="notify('Messaging is coming soon 💜')">
+
+            <button class="public-message-btn"
+              onclick="notify('Messaging is coming soon 💜')">
               Message
             </button>
+
           </div>
         </div>
 
-        <h2 class="public-profile-name">${escapeHTML(profileName(profile))}</h2>
-        <p class="public-profile-handle">@${escapeHTML(username(profile))}</p>
+        <h2 class="public-profile-name">
+          ${escapeHTML(profileName(profile))}
+        </h2>
+
+        <p class="public-profile-handle">
+          @${escapeHTML(username(profile))}
+        </p>
 
         <p class="public-profile-bio">
           ${escapeHTML(profile.bio || "Living my LEAKA life 💜")}
         </p>
 
         <div class="public-profile-stats">
+
           <div>
             <strong>${canSeePosts ? "..." : "—"}</strong>
             <span>Posts</span>
           </div>
+
           <div>
             <strong>${followers || 0}</strong>
             <span>Followers</span>
           </div>
+
           <div>
             <strong>${following || 0}</strong>
             <span>Following</span>
           </div>
+
         </div>
 
-        ${canSeePosts ? `
-          <div class="public-profile-tabs">
-            <button class="selected">Posts</button>
-          </div>
-          <div class="public-profile-posts" id="publicProfilePosts">
-            <div class="public-profile-post-empty">Loading posts...</div>
-          </div>
-        ` : `
-          <div class="public-profile-private">
-            <div style="font-size:38px;margin-bottom:12px">🔒</div>
-            <strong>This account is private</strong>
-            Follow this account to see their photos and videos.
-          </div>
-        `}
+        ${
+          canSeePosts
+            ? `
+              <div class="public-profile-tabs">
+                <button class="selected">Posts</button>
+              </div>
+
+              <div class="public-profile-posts"
+                id="publicProfilePosts">
+                <div class="public-profile-post-empty">
+                  Loading posts...
+                </div>
+              </div>
+            `
+            : `
+              <div class="public-profile-private">
+                <div style="font-size:38px">🔒</div>
+                <strong>This account is private</strong>
+                Follow this account to see their posts.
+              </div>
+            `
+        }
 
       </div>
     </div>
@@ -1282,11 +1342,72 @@ async function openPublicProfile(userId) {
     await loadPublicPosts(userId);
   }
 
-  $("publicFollowBtn")?.addEventListener("click", toggleFollow);
+  $("publicFollowBtn")?.addEventListener(
+    "click",
+    toggleFollow
+  );
 }
 
 // =========================================
-// FOLLOW / UNFOLLOW / REQUEST
+// PUBLIC PROFILE POSTS
+// =========================================
+
+async function loadPublicPosts(userId) {
+  const container = $("publicProfilePosts");
+
+  if (!container) return;
+
+  const { data, error } = await db
+    .from("posts")
+    .select("*")
+    .eq("user_id", userId)
+    .order("created_at", { ascending: false });
+
+  if (error) {
+    container.innerHTML = `
+      <div class="public-profile-post-empty">
+        Posts could not be loaded.
+      </div>`;
+    return;
+  }
+
+  const countElement = container
+    .closest(".public-profile-body")
+    ?.querySelector(".public-profile-stats strong");
+
+  if (countElement) {
+    countElement.textContent = data.length;
+  }
+
+  if (!data.length) {
+    container.innerHTML = `
+      <div class="public-profile-post-empty">
+        No posts yet. Check back later 💜
+      </div>`;
+    return;
+  }
+
+  container.innerHTML = data.map(post => `
+    <div class="public-profile-post">
+
+      ${
+        post.media_url
+          ? post.media_type === "video"
+            ? `<video src="${escapeHTML(post.media_url)}"
+                 muted playsinline></video>`
+            : `<img src="${escapeHTML(post.media_url)}"
+                 alt="">`
+          : `<div style="padding:12px;font-size:12px">
+               ${escapeHTML(post.caption)}
+             </div>`
+      }
+
+    </div>
+  `).join("");
+}
+
+// =========================================
+// FOLLOW / UNFOLLOW
 // =========================================
 
 async function toggleFollow() {
@@ -1317,13 +1438,14 @@ async function toggleFollow() {
       if (error) throw error;
 
       notify("Unfollowed.");
+
       await openPublicProfile(targetId);
       return;
     }
 
     const { data: existingRequest } = await db
       .from("follow_requests")
-      .select("id,status")
+      .select("id")
       .eq("requester_id", currentUser.id)
       .eq("receiver_id", targetId)
       .eq("status", "pending")
@@ -1379,56 +1501,11 @@ async function toggleFollow() {
     notify(error.message, true);
   } finally {
     const currentButton = $("publicFollowBtn");
-    if (currentButton) currentButton.disabled = false;
+
+    if (currentButton) {
+      currentButton.disabled = false;
+    }
   }
-}
-
-// =========================================
-// PUBLIC PROFILE POSTS
-// =========================================
-
-async function loadPublicPosts(userId) {
-  const container = $("publicProfilePosts");
-  if (!container) return;
-
-  const { data, error } = await db
-    .from("posts")
-    .select("*")
-    .eq("user_id", userId)
-    .order("created_at", { ascending: false });
-
-  if (error) {
-    container.innerHTML = `
-      <div class="public-profile-post-empty">
-        Posts could not be loaded.
-      </div>`;
-    return;
-  }
-
-  const countElement = container
-    .closest(".public-profile-body")
-    ?.querySelector(".public-profile-stats strong");
-
-  if (countElement) countElement.textContent = data.length;
-
-  if (!data.length) {
-    container.innerHTML = `
-      <div class="public-profile-post-empty">
-        No posts yet. Check back later 💜
-      </div>`;
-    return;
-  }
-
-  container.innerHTML = data.map(post => `
-    <div class="public-profile-post">
-      ${post.media_url
-        ? post.media_type === "video"
-          ? `<video src="${escapeHTML(post.media_url)}" muted playsinline></video>`
-          : `<img src="${escapeHTML(post.media_url)}" alt="">`
-        : `<div style="padding:12px;font-size:12px">${escapeHTML(post.caption)}</div>`
-      }
-    </div>
-  `).join("");
 }
 
 // =========================================
@@ -1448,11 +1525,13 @@ async function createNotification(userId, type, message) {
       is_read: false
     });
 
-  if (error) console.error("Notification error:", error);
+  if (error) {
+    console.error("Notification error:", error);
+  }
 }
 
 // =========================================
-// FOLLOW REQUEST MANAGEMENT
+// FOLLOW REQUESTS
 // =========================================
 
 async function loadFollowRequests() {
@@ -1474,11 +1553,13 @@ async function loadFollowRequests() {
 }
 
 async function renderFollowRequests(container) {
+  if (!container) return;
+
   const requests = await loadFollowRequests();
 
   if (!requests.length) {
     container.innerHTML = `
-      <p style="color:#9584a3;padding:15px 0">
+      <p class="muted">
         No pending follow requests.
       </p>`;
     return;
@@ -1487,23 +1568,36 @@ async function renderFollowRequests(container) {
   container.innerHTML = "";
 
   for (const request of requests) {
-    const profile = await getProfile(request.requester_id).catch(() => null);
+    const profile = await getProfile(request.requester_id)
+      .catch(() => null);
 
     if (!profile) continue;
 
     const item = document.createElement("div");
+
     item.className = "request-list-item";
 
     item.innerHTML = `
       <div class="request-avatar">
-        ${avatarHTML(profile.avatar_url, profileName(profile))}
+        ${avatarHTML(
+          profile.avatar_url,
+          profileName(profile)
+        )}
       </div>
+
       <div class="request-info">
         <strong>${escapeHTML(profileName(profile))}</strong>
         <small>@${escapeHTML(username(profile))}</small>
       </div>
-      <button data-accept-request="${request.id}">Accept</button>
-      <button class="decline" data-decline-request="${request.id}">×</button>
+
+      <button data-accept-request="${escapeHTML(request.id)}">
+        Accept
+      </button>
+
+      <button class="decline"
+        data-decline-request="${escapeHTML(request.id)}">
+        ×
+      </button>
     `;
 
     container.appendChild(item);
@@ -1520,7 +1614,10 @@ async function handleFollowRequest(requestId, accepted) {
     .eq("receiver_id", currentUser.id)
     .single();
 
-  if (fetchError) return notify(fetchError.message, true);
+  if (fetchError) {
+    notify(fetchError.message, true);
+    return;
+  }
 
   const { error } = await db
     .from("follow_requests")
@@ -1530,7 +1627,10 @@ async function handleFollowRequest(requestId, accepted) {
     .eq("id", requestId)
     .eq("receiver_id", currentUser.id);
 
-  if (error) return notify(error.message, true);
+  if (error) {
+    notify(error.message, true);
+    return;
+  }
 
   if (accepted) {
     const { error: followError } = await db
@@ -1552,26 +1652,39 @@ async function handleFollowRequest(requestId, accepted) {
     );
 
     notify("Follow request accepted 💜");
+
   } else {
     notify("Follow request declined.");
   }
 
-  const container = $("followRequestsList");
-  if (container) await renderFollowRequests(container);
+  if ($("followRequestsList")) {
+    await renderFollowRequests($("followRequestsList"));
+  }
 
   await loadMyCounts();
 }
 
 document.addEventListener("click", event => {
-  const accept = event.target.closest("[data-accept-request]");
-  const decline = event.target.closest("[data-decline-request]");
+  const accept = event.target.closest(
+    "[data-accept-request]"
+  );
+
+  const decline = event.target.closest(
+    "[data-decline-request]"
+  );
 
   if (accept) {
-    handleFollowRequest(accept.dataset.acceptRequest, true);
+    handleFollowRequest(
+      accept.dataset.acceptRequest,
+      true
+    );
   }
 
   if (decline) {
-    handleFollowRequest(decline.dataset.declineRequest, false);
+    handleFollowRequest(
+      decline.dataset.declineRequest,
+      false
+    );
   }
 });
 
@@ -1579,26 +1692,31 @@ document.addEventListener("click", event => {
 // PROFILE TABS
 // =========================================
 
-document.querySelectorAll("[data-profile-tab]").forEach(button => {
-  button.addEventListener("click", () => {
-    document.querySelectorAll("[data-profile-tab]").forEach(tab => {
-      tab.classList.remove("selected");
+document.querySelectorAll("[data-profile-tab]")
+  .forEach(button => {
+
+    button.addEventListener("click", () => {
+
+      document.querySelectorAll("[data-profile-tab]")
+        .forEach(tab => {
+          tab.classList.remove("selected");
+        });
+
+      button.classList.add("selected");
+
+      const type = button.dataset.profileTab;
+
+      if (type === "posts") {
+        loadMyPosts();
+
+      } else if (type === "videos") {
+        notify("Video filtering is coming soon 💜");
+
+      } else {
+        notify("Liked posts view is coming soon 💜");
+      }
     });
-
-    button.classList.add("selected");
-
-    const type = button.dataset.profileTab;
-
-    if (type === "posts") {
-      loadMyPosts();
-    } else if (type === "videos") {
-      loadMyPosts();
-      notify("Video filtering is coming soon.");
-    } else {
-      notify("Liked posts view is coming soon.");
-    }
   });
-});
 
 // =========================================
 // STORIES
@@ -1610,227 +1728,85 @@ $("createStoryBtn")?.addEventListener("click", () => {
 
 $("storyInput")?.addEventListener("change", async event => {
   const file = event.target.files[0];
+
   if (!file) return;
 
+  if (
+    !file.type.startsWith("image/") &&
+    !file.type.startsWith("video/")
+  ) {
+    notify("Choose an image or video.", true);
+    return;
+  }
+
   const url = await uploadMedia(file, "stories");
+
   if (!url) return;
 
-  notify("Story uploaded to storage. Story publishing is coming soon.");
+  notify("Story media uploaded 💜 Story publishing still needs a stories database feature.");
+
+  event.target.value = "";
 });
 
 // =========================================
-// PRIVACY SETTING
+// PRIVACY
 // =========================================
 
 async function loadPrivacySetting() {
   if (!currentUser || !$("privateAccount")) return;
 
-  $("privateAccount").checked = !!currentProfile?.is_private;
+  $("privateAccount").checked =
+    !!currentProfile?.is_private;
 }
 
-$("privateAccount")?.addEventListener("change", async event => {
-  const isPrivate = event.target.checked;
+$("privateAccount")?.addEventListener(
+  "change",
+  async event => {
 
-  const { data, error } = await db
-    .from("profiles")
-    .update({ is_private: isPrivate })
-    .eq("id", currentUser.id)
-    .select()
-    .single();
+    if (!currentUser) return;
 
-  if (error) {
-    event.target.checked = !isPrivate;
-    notify(error.message, true);
-    return;
+    const isPrivate = event.target.checked;
+
+    const { data, error } = await db
+      .from("profiles")
+      .update({
+        is_private: isPrivate
+      })
+      .eq("id", currentUser.id)
+      .select()
+      .single();
+
+    if (error) {
+      event.target.checked = !isPrivate;
+      notify(error.message, true);
+      return;
+    }
+
+    currentProfile = data;
+
+    notify(
+      isPrivate
+        ? "Your account is now private 🔒"
+        : "Your account is now public 💜"
+    );
   }
+);
 
-  currentProfile = data;
+// =========================================
+// KEYBOARD SUPPORT
+// =========================================
 
-  notify(
-    isPrivate
-      ? "Your account is now private 🔒"
-      : "Your account is now public 💜"
-  );
+document.addEventListener("keydown", event => {
+  if (event.key === "Escape") {
+    closePublicProfile();
+  }
 });
 
 // =========================================
-// START APP
+// START LEAKA
 // =========================================
 
-checkSession();
-
-/* =====================================
-   LEAKA — NEW CREATE MENU + NAVIGATION
-===================================== */
-
-const createToggle = document.getElementById("createToggle");
-const createMenu = document.getElementById("createMenu");
-const menuStoryBtn = document.getElementById("menuStoryBtn");
-const menuPostBtn = document.getElementById("menuPostBtn");
-const createPostCard = document.getElementById("createPostCard");
-const closeCreatePost = document.getElementById("closeCreatePost");
-
-// Open and close the plus menu
-createToggle?.addEventListener("click", () => {
-  createMenu.hidden = !createMenu.hidden;
+checkSession().catch(error => {
+  console.error("LEAKA startup error:", error);
+  notify("Something went wrong starting LEAKA.", true);
 });
-
-// Close menu when clicking outside
-document.addEventListener("click", event => {
-  if (
-    createMenu &&
-    !createMenu.hidden &&
-    !createMenu.contains(event.target) &&
-    !createToggle.contains(event.target)
-  ) {
-    createMenu.hidden = true;
-  }
-});
-
-// Add story
-menuStoryBtn?.addEventListener("click", () => {
-  createMenu.hidden = true;
-  document.getElementById("createStoryBtn")?.click();
-});
-
-// Create post
-menuPostBtn?.addEventListener("click", () => {
-  createMenu.hidden = true;
-
-  showPage("feed");
-
-  createPostCard.hidden = false;
-
-  setTimeout(() => {
-    createPostCard.scrollIntoView({
-      behavior: "smooth",
-      block: "center"
-    });
-
-    document.getElementById("caption")?.focus();
-  }, 150);
-});
-
-// Close post creator
-closeCreatePost?.addEventListener("click", () => {
-  createPostCard.hidden = true;
-});
-
-// Hide creator after successful publishing
-const originalPostButton = document.getElementById("postBtn");
-
-originalPostButton?.addEventListener("click", () => {
-  setTimeout(() => {
-    const caption = document.getElementById("caption");
-
-    if (
-      caption &&
-      caption.value.trim() === "" &&
-      !document.getElementById("mediaInput").files.length
-    ) {
-      createPostCard.hidden = true;
-    }
-  }, 1000);
-});
-
-// Load follow requests when settings opens
-document.querySelectorAll('[data-page="settings"]').forEach(button => {
-  button.addEventListener("click", async () => {
-    const list = document.getElementById("followRequestsList");
-
-    if (list) {
-      await renderFollowRequests(list);
-    }
-
-    await loadPrivacySetting();
-  });
-});
-
-/* =====================================
-   LEAKA — NEW CREATE MENU + NAVIGATION
-===================================== */
-
-const createToggle = document.getElementById("createToggle");
-const createMenu = document.getElementById("createMenu");
-const menuStoryBtn = document.getElementById("menuStoryBtn");
-const menuPostBtn = document.getElementById("menuPostBtn");
-const createPostCard = document.getElementById("createPostCard");
-const closeCreatePost = document.getElementById("closeCreatePost");
-
-// Open and close the plus menu
-createToggle?.addEventListener("click", () => {
-  createMenu.hidden = !createMenu.hidden;
-});
-
-// Close menu when clicking outside
-document.addEventListener("click", event => {
-  if (
-    createMenu &&
-    !createMenu.hidden &&
-    !createMenu.contains(event.target) &&
-    !createToggle.contains(event.target)
-  ) {
-    createMenu.hidden = true;
-  }
-});
-
-// Add story
-menuStoryBtn?.addEventListener("click", () => {
-  createMenu.hidden = true;
-  document.getElementById("createStoryBtn")?.click();
-});
-
-// Create post
-menuPostBtn?.addEventListener("click", () => {
-  createMenu.hidden = true;
-
-  showPage("feed");
-
-  createPostCard.hidden = false;
-
-  setTimeout(() => {
-    createPostCard.scrollIntoView({
-      behavior: "smooth",
-      block: "center"
-    });
-
-    document.getElementById("caption")?.focus();
-  }, 150);
-});
-
-// Close post creator
-closeCreatePost?.addEventListener("click", () => {
-  createPostCard.hidden = true;
-});
-
-// Hide creator after successful publishing
-const originalPostButton = document.getElementById("postBtn");
-
-originalPostButton?.addEventListener("click", () => {
-  setTimeout(() => {
-    const caption = document.getElementById("caption");
-
-    if (
-      caption &&
-      caption.value.trim() === "" &&
-      !document.getElementById("mediaInput").files.length
-    ) {
-      createPostCard.hidden = true;
-    }
-  }, 1000);
-});
-
-// Load follow requests when settings opens
-document.querySelectorAll('[data-page="settings"]').forEach(button => {
-  button.addEventListener("click", async () => {
-    const list = document.getElementById("followRequestsList");
-
-    if (list) {
-      await renderFollowRequests(list);
-    }
-
-    await loadPrivacySetting();
-  });
-});
-
-
