@@ -1349,3 +1349,117 @@ button:focus-visible,
 .notification-content small {
   font-size: 11px;
 }
+/* =========================================
+   LEAKA DARK PUBLIC PROFILES
+========================================= */
+
+.public-profile-card {
+  background: #191421 !important;
+  color: #f8f4ff !important;
+  border: 1px solid #ffffff12;
+  box-shadow: 0 25px 90px #000b;
+}
+
+.public-profile-cover {
+  background:
+    radial-gradient(circle at 20% 30%, #bd8aff, transparent 55%),
+    linear-gradient(135deg, #27153e, #7138bd, #1a1126);
+}
+
+.public-profile-body {
+  background: #191421;
+}
+
+.public-profile-avatar {
+  border-color: #191421;
+  background: linear-gradient(135deg, #bd8aff, #7138bd);
+}
+
+.public-profile-name {
+  color: #f8f4ff;
+}
+
+.public-profile-handle {
+  color: #bd8aff;
+}
+
+.public-profile-bio {
+  color: #b9abc9;
+}
+
+.public-profile-stats {
+  border-color: #ffffff15;
+}
+
+.public-profile-stats strong {
+  color: #f8f4ff;
+}
+
+.public-profile-stats span {
+  color: #a99bb9;
+}
+
+.public-profile-tabs {
+  border-color: #ffffff15;
+}
+
+.public-profile-tabs button {
+  color: #a99bb9;
+}
+
+.public-profile-tabs button.selected {
+  color: #bd8aff;
+  border-color: #9558e8;
+}
+
+.public-profile-private {
+  color: #a99bb9;
+}
+
+.public-profile-private strong {
+  color: #f8f4ff;
+}
+
+.public-profile-post {
+  background: #211a2d;
+}
+
+.public-profile-post-empty {
+  color: #a99bb9;
+}
+
+.public-follow-btn.following,
+.public-message-btn {
+  background: #30223f;
+  color: #d6baff;
+  border: 1px solid #ffffff12;
+}
+
+/* Dark loading profile */
+
+.public-profile-loading {
+  min-height: 220px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  gap: 17px;
+  color: #d5b9ff;
+  background: #191421;
+  text-align: center;
+}
+
+.leaka-spinner {
+  width: 43px;
+  height: 43px;
+  border: 4px solid #ffffff16;
+  border-top-color: #bd8aff;
+  border-radius: 50%;
+  animation: leakaSpin .8s linear infinite;
+}
+
+@keyframes leakaSpin {
+  to {
+    transform: rotate(360deg);
+  }
+}
