@@ -1307,3 +1307,66 @@ footer {
 .search-user:last-child {
   border-bottom: none;
 }
+/* =================================
+   LEAKA SEARCH RESULTS
+================================= */
+
+.search-results {
+  display: none;
+  width: min(92%, 650px);
+  max-height: 420px;
+  overflow-y: auto;
+  margin: 10px auto 20px;
+  background: #130e1d;
+  border: 1px solid #493263;
+  border-radius: 16px;
+  box-shadow: 0 15px 40px #0009;
+  position: relative;
+  z-index: 200;
+}
+
+.search-results:not(:empty) {
+  display: block;
+}
+
+.search-user {
+  display: flex;
+  align-items: center;
+  gap: 13px;
+  padding: 16px;
+  border-bottom: 1px solid #30213f;
+  color: white;
+  cursor: pointer;
+  transition: background .2s;
+}
+
+.search-user:hover {
+  background: #241832;
+}
+
+.search-user:last-child {
+  border-bottom: none;
+}
+
+.search-user strong {
+  display: block;
+  font-size: 14px;
+}
+
+.search-user span {
+  display: block;
+  color: #a398b5;
+  font-size: 12px;
+  margin-top: 4px;
+}
+
+.search-user-avatar {
+  width: 43px;
+  height: 43px;
+  border-radius: 50%;
+  background: linear-gradient(135deg,#bd8aff,#8244d9);
+  display: grid;
+  place-items: center;
+  font-weight: bold;
+  flex-shrink: 0;
+}
