@@ -1,19 +1,13 @@
 
 /* =====================================================
-   LEAKA — PREMIUM SOCIAL MEDIA DESIGN
-   Complete Updated Stylesheet
+   LEAKA — PREMIUM SOCIAL MEDIA
+   COMPLETE STYLESHEET
    Dark Mode • Purple Glow • Mobile First
-   Feed • Stories • Profiles • Notifications • Settings
-===================================================== */
-
-/* =====================================================
-   1. ROOT VARIABLES
 ===================================================== */
 
 :root {
   --bg: #090611;
   --bg-secondary: #100b1b;
-
   --panel: #171123;
   --panel-light: #20172e;
   --panel-hover: #281c39;
@@ -26,26 +20,20 @@
   --text: #f8f4ff;
   --muted: #a99bb9;
 
-  --border: rgba(183, 130, 255, 0.15);
-  --border-strong: rgba(183, 130, 255, 0.3);
+  --border: rgba(183,130,255,.15);
+  --border-strong: rgba(183,130,255,.3);
 
   --danger: #ff557c;
   --success: #60d6a0;
 
-  --shadow:
-    0 12px 35px rgba(0, 0, 0, 0.35);
-
-  --glow:
-    0 0 25px rgba(155, 92, 255, 0.2);
+  --shadow: 0 12px 35px rgba(0,0,0,.35);
+  --glow: 0 0 25px rgba(155,92,255,.2);
 
   --radius: 18px;
   --radius-small: 12px;
 }
 
-
-/* =====================================================
-   2. GLOBAL RESET
-===================================================== */
+/* RESET */
 
 * {
   box-sizing: border-box;
@@ -61,34 +49,15 @@ html {
 body {
   min-height: 100vh;
   background:
-    radial-gradient(
-      circle at 10% 0%,
-      rgba(116, 51, 190, 0.12),
-      transparent 35%
-    ),
-    radial-gradient(
-      circle at 100% 35%,
-      rgba(87, 40, 143, 0.1),
-      transparent 35%
-    ),
+    radial-gradient(circle at 10% 0%,rgba(116,51,190,.12),transparent 35%),
+    radial-gradient(circle at 100% 35%,rgba(87,40,143,.1),transparent 35%),
     var(--bg);
-
   color: var(--text);
-
-  font-family:
-    Inter,
-    -apple-system,
-    BlinkMacSystemFont,
-    "Segoe UI",
-    sans-serif;
-
+  font-family: Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
   overflow-x: hidden;
 }
 
-button,
-input,
-textarea,
-select {
+button,input,textarea,select {
   font: inherit;
 }
 
@@ -96,15 +65,39 @@ button {
   cursor: pointer;
   border: none;
   color: inherit;
+  border-radius: var(--radius-small);
+  padding: 11px 16px;
+  background: linear-gradient(135deg,var(--purple-dark),var(--purple),#a76aff);
+  font-weight: 700;
+  transition: .2s ease;
+}
+
+button:hover {
+  filter: brightness(1.12);
+  box-shadow: var(--glow);
+}
+
+button:active {
+  transform: scale(.97);
 }
 
 button:disabled {
-  opacity: 0.55;
+  opacity: .55;
   cursor: not-allowed;
 }
 
-img,
-video {
+.secondary,.action-btn {
+  background: var(--panel-light);
+  border: 1px solid var(--border);
+}
+
+.danger,.decline {
+  background: rgba(255,85,124,.13);
+  color: #ff8ca6;
+  border: 1px solid rgba(255,85,124,.2);
+}
+
+img,video {
   max-width: 100%;
 }
 
@@ -121,23 +114,15 @@ a {
   display: none !important;
 }
 
-.muted,
-small {
+.muted,small {
   color: var(--muted);
 }
 
-
-/* =====================================================
-   3. SCROLLBARS
-===================================================== */
+/* SCROLLBARS */
 
 ::-webkit-scrollbar {
   width: 6px;
   height: 5px;
-}
-
-::-webkit-scrollbar-track {
-  background: transparent;
 }
 
 ::-webkit-scrollbar-thumb {
@@ -145,44 +130,26 @@ small {
   border-radius: 20px;
 }
 
-::-webkit-scrollbar-thumb:hover {
-  background: var(--purple);
-}
+/* INPUTS */
 
-
-/* =====================================================
-   4. INPUTS AND TEXT AREAS
-===================================================== */
-
-input,
-textarea,
-select {
+input,textarea,select {
   width: 100%;
   background: #100b19;
   color: var(--text);
-
   border: 1px solid var(--border);
   border-radius: var(--radius-small);
-
   padding: 13px 15px;
   outline: none;
-
-  transition:
-    border-color 0.2s ease,
-    box-shadow 0.2s ease,
-    background 0.2s ease;
+  transition: .2s ease;
 }
 
-input::placeholder,
-textarea::placeholder {
+input::placeholder,textarea::placeholder {
   color: #81738f;
 }
 
-input:focus,
-textarea:focus,
-select:focus {
+input:focus,textarea:focus,select:focus {
   border-color: var(--purple);
-  box-shadow: 0 0 0 3px rgba(155, 92, 255, 0.13);
+  box-shadow: 0 0 0 3px rgba(155,92,255,.13);
   background: #140e20;
 }
 
@@ -199,60 +166,9 @@ input[type="checkbox"] {
   width: 19px;
   height: 19px;
   accent-color: var(--purple);
-  cursor: pointer;
 }
 
-
-/* =====================================================
-   5. BUTTONS
-===================================================== */
-
-button {
-  border-radius: var(--radius-small);
-  padding: 11px 16px;
-
-  background: linear-gradient(
-    135deg,
-    var(--purple-dark),
-    var(--purple),
-    #a76aff
-  );
-
-  color: white;
-  font-weight: 700;
-
-  transition:
-    transform 0.2s ease,
-    filter 0.2s ease,
-    box-shadow 0.2s ease;
-}
-
-button:hover {
-  filter: brightness(1.12);
-  box-shadow: var(--glow);
-}
-
-button:active {
-  transform: scale(0.97);
-}
-
-.secondary,
-.action-btn {
-  background: var(--panel-light);
-  border: 1px solid var(--border);
-}
-
-.danger,
-.decline {
-  background: rgba(255, 85, 124, 0.13);
-  color: #ff8ca6;
-  border: 1px solid rgba(255, 85, 124, 0.2);
-}
-
-
-/* =====================================================
-   6. AUTHENTICATION SCREEN
-===================================================== */
+/* AUTHENTICATION */
 
 #auth {
   min-height: 100vh;
@@ -264,17 +180,11 @@ button:active {
 .auth-container {
   width: 100%;
   max-width: 420px;
-
   padding: 36px 25px;
-
-  background: rgba(23, 17, 35, 0.94);
+  background: rgba(23,17,35,.94);
   border: 1px solid var(--border);
   border-radius: 25px;
-
-  box-shadow:
-    0 20px 70px rgba(0, 0, 0, 0.5),
-    0 0 35px rgba(155, 92, 255, 0.12);
-
+  box-shadow: 0 20px 70px rgba(0,0,0,.5),0 0 35px rgba(155,92,255,.12);
   text-align: center;
 }
 
@@ -282,18 +192,10 @@ button:active {
   font-size: 38px;
   font-weight: 950;
   letter-spacing: 2px;
-
-  background: linear-gradient(
-    120deg,
-    #ffffff,
-    #c99cff,
-    #8f4cff
-  );
-
+  background: linear-gradient(120deg,#fff,#c99cff,#8f4cff);
   background-clip: text;
   -webkit-background-clip: text;
   color: transparent;
-
   margin-bottom: 10px;
 }
 
@@ -330,10 +232,7 @@ button:active {
   overflow-wrap: anywhere;
 }
 
-
-/* =====================================================
-   7. MAIN APPLICATION HEADER
-===================================================== */
+/* HEADER */
 
 #appContent {
   min-height: 100vh;
@@ -341,20 +240,15 @@ button:active {
 
 .top-header {
   height: 68px;
-
   padding: 0 20px;
-
   display: flex;
   justify-content: space-between;
   align-items: center;
-
   position: sticky;
   top: 0;
   z-index: 100;
-
-  background: rgba(9, 6, 17, 0.88);
+  background: rgba(9,6,17,.88);
   backdrop-filter: blur(18px);
-
   border-bottom: 1px solid var(--border);
 }
 
@@ -375,10 +269,8 @@ button:active {
   width: 40px;
   height: 40px;
   padding: 0;
-
   display: grid;
   place-items: center;
-
   border-radius: 50%;
   background: var(--panel-light);
   border: 1px solid var(--border);
@@ -391,10 +283,7 @@ button:active {
   border-radius: 50%;
 }
 
-
-/* =====================================================
-   8. PAGE LAYOUT
-===================================================== */
+/* PAGE LAYOUT */
 
 main {
   width: 100%;
@@ -403,25 +292,15 @@ main {
 .page {
   width: 100%;
   max-width: 760px;
-
   min-height: calc(100vh - 140px);
-
   margin: auto;
   padding: 22px 16px 115px;
-
-  animation: pageEnter 0.25s ease;
+  animation: pageEnter .25s ease;
 }
 
 @keyframes pageEnter {
-  from {
-    opacity: 0;
-    transform: translateY(7px);
-  }
-
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
+  from { opacity: 0; transform: translateY(7px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 
 .page-heading {
@@ -439,20 +318,15 @@ main {
   font-size: 13px;
 }
 
-.section-heading,
-.feed-heading {
+.section-heading,.feed-heading {
   margin-bottom: 14px;
 }
 
-.section-heading h3,
-.feed-heading h3 {
+.section-heading h3,.feed-heading h3 {
   font-size: 16px;
 }
 
-
-/* =====================================================
-   9. STORIES
-===================================================== */
+/* STORIES */
 
 .stories-section {
   margin-bottom: 25px;
@@ -462,10 +336,8 @@ main {
   display: flex;
   align-items: flex-start;
   gap: 14px;
-
   overflow-x: auto;
   padding: 10px 2px 15px;
-
   scrollbar-width: none;
 }
 
@@ -473,51 +345,36 @@ main {
   display: none;
 }
 
-.story-item,
-.story-create-button {
+.story-item,.story-create-button {
   flex: 0 0 75px;
-
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 7px;
-
   background: transparent;
   padding: 0;
-
   text-align: center;
   color: var(--text);
+  box-shadow: none;
 }
 
 .story-ring {
   width: 66px;
   height: 66px;
-
   padding: 3px;
   border-radius: 50%;
-
-  background: linear-gradient(
-    135deg,
-    #9d5bff,
-    #ec80d6,
-    #6840d8
-  );
-
-  box-shadow: 0 0 15px rgba(155, 92, 255, 0.2);
+  background: linear-gradient(135deg,#9d5bff,#ec80d6,#6840d8);
+  box-shadow: 0 0 15px rgba(155,92,255,.2);
 }
 
 .story-avatar {
   width: 100%;
   height: 100%;
-
   display: grid;
   place-items: center;
-
   overflow: hidden;
-
   border: 3px solid var(--bg);
   border-radius: 50%;
-
   background: var(--panel-light);
   font-size: 20px;
   font-weight: 800;
@@ -529,8 +386,7 @@ main {
   object-fit: cover;
 }
 
-.story-item small,
-.story-create-button small {
+.story-item small,.story-create-button small {
   font-size: 11px;
   max-width: 75px;
   overflow: hidden;
@@ -549,11 +405,7 @@ main {
   font-size: 30px;
 }
 
-
-
-/* =====================================================
-   10. LEAKA — WHATSAPP STYLE STORY VIEWER
-===================================================== */
+/* STORY VIEWER */
 
 #storyViewer {
   position: fixed;
@@ -598,7 +450,7 @@ main {
   right: 0;
   z-index: 5;
   padding: 12px 12px 15px;
-  background: linear-gradient(#0009, transparent);
+  background: linear-gradient(#0009,transparent);
 }
 
 .story-progress-list {
@@ -652,8 +504,7 @@ main {
   font-size: 24px;
 }
 
-.story-tap-left,
-.story-tap-right {
+.story-tap-left,.story-tap-right {
   position: absolute;
   top: 75px;
   bottom: 100px;
@@ -661,21 +512,15 @@ main {
   width: 30%;
 }
 
-.story-tap-left {
-  left: 0;
-}
-
-.story-tap-right {
-  right: 0;
-  width: 70%;
-}
+.story-tap-left { left: 0; }
+.story-tap-right { right: 0; width: 70%; }
 
 .story-pause-indicator {
   position: absolute;
   z-index: 15;
   top: 50%;
   left: 50%;
-  transform: translate(-50%, -50%);
+  transform: translate(-50%,-50%);
   background: #0009;
   padding: 16px 22px;
   border-radius: 50%;
@@ -683,8 +528,6 @@ main {
   color: white;
   display: none;
 }
-
-/* Viewer button */
 
 .story-owner-views {
   position: absolute;
@@ -702,8 +545,6 @@ main {
   color: white;
   font-size: 13px;
 }
-
-/* Quick reactions */
 
 .story-reply-area {
   position: absolute;
@@ -738,8 +579,6 @@ main {
   color: white;
   padding: 11px 15px;
 }
-
-/* Viewers bottom sheet */
 
 .story-viewers-panel {
   position: absolute;
@@ -776,10 +615,6 @@ main {
   margin-bottom: 18px;
 }
 
-.story-viewers-heading h3 {
-  font-size: 16px;
-}
-
 .story-viewer-row {
   display: flex;
   align-items: center;
@@ -812,31 +647,14 @@ main {
   font-size: 13px;
 }
 
-@media (min-width: 700px) {
-  #storyViewer {
-    background: #08050d;
-  }
-
-  #storyViewer .story-viewer-content {
-    max-width: 440px;
-    left: 50%;
-    transform: translateX(-50%);
-  }
-}
-
-/* =====================================================
-   11. CREATE POST
-===================================================== */
+/* CREATE POST */
 
 .create-post-card {
   background: var(--panel);
   border: 1px solid var(--border);
-
   border-radius: var(--radius);
   padding: 17px;
-
   margin-bottom: 27px;
-
   box-shadow: var(--shadow);
 }
 
@@ -874,18 +692,14 @@ main {
   border-radius: 13px;
 }
 
-.media-preview img,
-.media-preview video {
+.media-preview img,.media-preview video {
   max-height: 350px;
   width: 100%;
   object-fit: contain;
   background: #000;
 }
 
-
-/* =====================================================
-   12. FEED POSTS
-===================================================== */
+/* FEED POSTS */
 
 #posts {
   display: flex;
@@ -895,13 +709,10 @@ main {
 
 .post-card {
   background: var(--panel);
-
   border: 1px solid var(--border);
   border-radius: var(--radius);
-
   padding: 16px;
   overflow: hidden;
-
   box-shadow: var(--shadow);
 }
 
@@ -909,28 +720,18 @@ main {
   display: flex;
   align-items: center;
   gap: 11px;
-
   margin-bottom: 13px;
 }
 
 .post-avatar {
   flex: 0 0 43px;
-
   width: 43px;
   height: 43px;
-
   display: grid;
   place-items: center;
-
   overflow: hidden;
   border-radius: 50%;
-
-  background: linear-gradient(
-    135deg,
-    #7139bd,
-    #c17cff
-  );
-
+  background: linear-gradient(135deg,#7139bd,#c17cff);
   font-size: 16px;
   font-weight: 800;
 }
@@ -957,19 +758,15 @@ main {
   line-height: 1.6;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
-
   margin: 12px 0;
 }
 
 .post-media {
   width: 100%;
   max-height: 520px;
-
   object-fit: contain;
-
   border-radius: 12px;
   background: #050308;
-
   margin: 10px 0;
 }
 
@@ -982,9 +779,7 @@ video.post-media {
   align-items: center;
   flex-wrap: wrap;
   gap: 9px;
-
   padding: 13px 0;
-
   border-top: 1px solid var(--border);
   margin-top: 12px;
 }
@@ -997,14 +792,11 @@ video.post-media {
 
 .action-btn.liked {
   color: #ff77b5;
-  border-color: rgba(255, 119, 181, 0.3);
-  background: rgba(255, 119, 181, 0.1);
+  border-color: rgba(255,119,181,.3);
+  background: rgba(255,119,181,.1);
 }
 
-
-/* =====================================================
-   13. COMMENTS
-===================================================== */
+/* COMMENTS */
 
 .comment-area {
   display: flex;
@@ -1036,10 +828,8 @@ video.post-media {
   background: var(--panel-light);
   border-radius: 10px;
   padding: 10px 12px;
-
   font-size: 12px;
   line-height: 1.5;
-
   overflow-wrap: anywhere;
 }
 
@@ -1047,28 +837,20 @@ video.post-media {
   color: var(--purple-light);
 }
 
-
-/* =====================================================
-   14. EMPTY STATES
-===================================================== */
+/* EMPTY STATES */
 
 .empty-state {
   width: 100%;
   min-height: 190px;
-
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-
   text-align: center;
-
   background: var(--panel);
   border: 1px dashed var(--border-strong);
-
   border-radius: var(--radius);
   padding: 30px 20px;
-
   color: var(--muted);
 }
 
@@ -1089,26 +871,13 @@ video.post-media {
   line-height: 1.6;
 }
 
-/* CSS accidentally placed in script.js — restored here */
-
 #profilePosts > .empty-state {
   grid-column: 1 / -1;
   width: 100%;
   min-height: 260px;
-
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-
-  padding: 40px 20px;
-  text-align: center;
 }
 
-
-/* =====================================================
-   15. SEARCH AND DISCOVERY
-===================================================== */
+/* SEARCH */
 
 .search-container {
   position: relative;
@@ -1130,16 +899,12 @@ video.post-media {
   display: flex;
   align-items: center;
   gap: 12px;
-
   padding: 12px;
-
   border-radius: 14px;
   background: var(--panel);
-
   border: 1px solid var(--border);
-
   cursor: pointer;
-  transition: background 0.2s ease;
+  transition: background .2s ease;
 }
 
 .search-user:hover {
@@ -1148,16 +913,12 @@ video.post-media {
 
 .search-user-avatar {
   flex: 0 0 44px;
-
   width: 44px;
   height: 44px;
-
   display: grid;
   place-items: center;
-
   overflow: hidden;
   border-radius: 50%;
-
   background: var(--panel-light);
   color: var(--purple-light);
   font-weight: 800;
@@ -1181,26 +942,15 @@ video.post-media {
   margin-top: 4px;
 }
 
-
-/* =====================================================
-   16. PROFILE PAGE
-===================================================== */
+/* PROFILE */
 
 .profile-cover {
   width: 100%;
   height: 175px;
-
   position: relative;
   overflow: hidden;
-
   border-radius: 18px;
-
-  background: linear-gradient(
-    120deg,
-    #32194e,
-    #914bd1,
-    #392252
-  );
+  background: linear-gradient(120deg,#32194e,#914bd1,#392252);
 }
 
 .profile-cover img {
@@ -1213,7 +963,6 @@ video.post-media {
   position: absolute;
   bottom: 12px;
   left: 15px;
-
   font-size: 12px;
   font-weight: 700;
   text-shadow: 0 2px 5px #000;
@@ -1227,36 +976,23 @@ video.post-media {
   display: flex;
   align-items: flex-end;
   justify-content: space-between;
-
   gap: 12px;
-
   margin-top: -38px;
   position: relative;
   z-index: 2;
-
   margin-bottom: 13px;
 }
 
 .profile-avatar {
   width: 88px;
   height: 88px;
-
   flex: 0 0 88px;
-
   display: grid;
   place-items: center;
-
   overflow: hidden;
-
   border-radius: 50%;
   border: 4px solid var(--bg);
-
-  background: linear-gradient(
-    135deg,
-    #7039bd,
-    #c18aff
-  );
-
+  background: linear-gradient(135deg,#7039bd,#c18aff);
   color: white;
   font-size: 26px;
   font-weight: 850;
@@ -1293,20 +1029,14 @@ video.post-media {
   margin-bottom: 3px;
 }
 
-
-/* =====================================================
-   17. PROFILE STATISTICS
-===================================================== */
+/* PROFILE STATISTICS */
 
 .profile-stats {
   display: flex;
   justify-content: space-around;
-
   gap: 10px;
-
   margin: 22px 0;
   padding: 17px 8px;
-
   background: var(--panel);
   border: 1px solid var(--border);
   border-radius: 15px;
@@ -1329,18 +1059,13 @@ video.post-media {
   color: var(--muted);
 }
 
-
-/* =====================================================
-   18. PROFILE EDITOR
-===================================================== */
+/* PROFILE EDITOR */
 
 #profileEditSection {
   background: var(--panel);
   border: 1px solid var(--border);
-
   padding: 18px;
   border-radius: var(--radius);
-
   margin: 20px 0;
 }
 
@@ -1348,13 +1073,11 @@ video.post-media {
   margin-bottom: 18px;
 }
 
-.edit-avatar-section,
-.edit-cover-section {
+.edit-avatar-section,.edit-cover-section {
   margin-bottom: 18px;
 }
 
-.edit-avatar-section label,
-.edit-cover-section label {
+.edit-avatar-section label,.edit-cover-section label {
   display: inline-block;
   color: var(--purple-light);
   font-size: 12px;
@@ -1390,13 +1113,9 @@ video.post-media {
   margin-top: 10px;
 }
 
+/* PROFILE POSTS */
 
-/* =====================================================
-   19. PROFILE POSTS GRID
-===================================================== */
-
-.profile-tabs,
-.profile-tabs button {
+.profile-tabs,.profile-tabs button {
   display: flex;
   align-items: center;
 }
@@ -1409,72 +1128,52 @@ video.post-media {
 .profile-tabs button {
   flex: 1;
   justify-content: center;
-
   background: var(--panel);
   border: 1px solid var(--border);
-
   color: var(--muted);
   padding: 11px 8px;
-
   font-size: 12px;
 }
 
 .profile-tabs button.selected {
-  background: linear-gradient(
-    135deg,
-    #7139bd,
-    #9b5cff
-  );
-
+  background: linear-gradient(135deg,#7139bd,#9b5cff);
   color: white;
   border-color: transparent;
 }
 
 #profilePosts {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(3,minmax(0,1fr));
   gap: 4px;
 }
 
 .public-profile-post {
   aspect-ratio: 1 / 1;
-
   overflow: hidden;
   border-radius: 7px;
-
   background: var(--panel-light);
-
   display: grid;
   place-items: center;
 }
 
-.public-profile-post img,
-.public-profile-post video {
+.public-profile-post img,.public-profile-post video {
   width: 100%;
   height: 100%;
   object-fit: cover;
 }
 
-
-/* =====================================================
-   20. PUBLIC PROFILE OVERLAY
-===================================================== */
+/* PUBLIC PROFILE */
 
 #publicProfileOverlay {
   position: fixed;
   inset: 0;
-
   z-index: 9990;
-
   display: flex;
   align-items: center;
   justify-content: center;
-
   padding: 15px;
-
-  background: rgba(0, 0, 0, 0.8);
+  background: rgba(0,0,0,.8);
   backdrop-filter: blur(9px);
-
   overflow-y: auto;
 }
 
@@ -1482,42 +1181,24 @@ video.post-media {
   width: 100%;
   max-width: 500px;
   max-height: 92vh;
-
   overflow-y: auto;
-
   background: var(--panel);
   border: 1px solid var(--border-strong);
-
   border-radius: 22px;
   box-shadow: 0 20px 80px #0009;
-
-  animation: profileOpen 0.25s ease;
+  animation: profileOpen .25s ease;
 }
 
 @keyframes profileOpen {
-  from {
-    opacity: 0;
-    transform: translateY(15px) scale(0.98);
-  }
-
-  to {
-    opacity: 1;
-    transform: translateY(0) scale(1);
-  }
+  from { opacity: 0; transform: translateY(15px) scale(.98); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
 }
 
 .public-profile-cover {
   height: 140px;
   position: relative;
-
   overflow: hidden;
-
-  background: linear-gradient(
-    120deg,
-    #32194e,
-    #914bd1,
-    #392252
-  );
+  background: linear-gradient(120deg,#32194e,#914bd1,#392252);
 }
 
 .public-profile-cover > img {
@@ -1530,18 +1211,13 @@ video.post-media {
   position: absolute;
   top: 12px;
   right: 12px;
-
   width: 37px;
   height: 37px;
-
   padding: 0;
-
   display: grid;
   place-items: center;
-
   border-radius: 50%;
-  background: rgba(10, 5, 18, 0.8);
-
+  background: rgba(10,5,18,.8);
   font-size: 23px;
 }
 
@@ -1553,31 +1229,20 @@ video.post-media {
   display: flex;
   align-items: flex-end;
   justify-content: space-between;
-
   gap: 10px;
   margin-top: -48px;
-
   position: relative;
 }
 
 .public-profile-avatar {
   width: 88px;
   height: 88px;
-
   border: 4px solid var(--panel);
   border-radius: 50%;
-
   overflow: hidden;
-
   display: grid;
   place-items: center;
-
-  background: linear-gradient(
-    135deg,
-    #7139bd,
-    #c18aff
-  );
-
+  background: linear-gradient(135deg,#7139bd,#c18aff);
   font-size: 25px;
   font-weight: 800;
 }
@@ -1630,10 +1295,8 @@ video.post-media {
 .public-profile-stats {
   display: flex;
   justify-content: space-around;
-
   margin: 20px 0;
   padding: 15px 5px;
-
   background: var(--panel-light);
   border-radius: 14px;
 }
@@ -1667,17 +1330,14 @@ video.post-media {
 
 .public-profile-posts {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(3,minmax(0,1fr));
   gap: 4px;
 }
 
-.public-profile-post-empty,
-.public-profile-private {
+.public-profile-post-empty,.public-profile-private {
   grid-column: 1 / -1;
-
   padding: 35px 15px;
   text-align: center;
-
   color: var(--muted);
   font-size: 13px;
 }
@@ -1688,49 +1348,32 @@ video.post-media {
   margin: 10px 0;
 }
 
-.public-profile-loading {
-  min-height: 180px;
-
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-
-  gap: 9px;
-  text-align: center;
-}
-
-.public-profile-loading small {
-  font-size: 11px;
-}
-
-
-/* =====================================================
-   21. LOADING SPINNER
-===================================================== */
+/* LOADING */
 
 .leaka-spinner {
   width: 38px;
   height: 38px;
-
-  border: 3px solid rgba(155, 92, 255, 0.15);
+  border: 3px solid rgba(155,92,255,.15);
   border-top-color: var(--purple-light);
-
   border-radius: 50%;
-
-  animation: leakaSpin 0.8s linear infinite;
+  animation: leakaSpin .8s linear infinite;
 }
 
 @keyframes leakaSpin {
-  to {
-    transform: rotate(360deg);
-  }
+  to { transform: rotate(360deg); }
 }
 
+.public-profile-loading {
+  min-height: 180px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  text-align: center;
+}
 
-/* =====================================================
-   22. NOTIFICATIONS
-===================================================== */
+/* NOTIFICATIONS */
 
 #notificationsList {
   display: flex;
@@ -1742,34 +1385,26 @@ video.post-media {
   display: flex;
   align-items: center;
   gap: 12px;
-
   padding: 13px;
-
   background: var(--panel);
   border: 1px solid var(--border);
-
   border-radius: 14px;
-
   cursor: pointer;
 }
 
 .notification-item.unread {
-  background: rgba(116, 57, 189, 0.17);
-  border-color: rgba(155, 92, 255, 0.3);
+  background: rgba(116,57,189,.17);
+  border-color: rgba(155,92,255,.3);
 }
 
 .notification-avatar {
   flex: 0 0 42px;
-
   width: 42px;
   height: 42px;
-
   display: grid;
   place-items: center;
-
   overflow: hidden;
   border-radius: 50%;
-
   background: var(--panel-light);
 }
 
@@ -1799,18 +1434,13 @@ video.post-media {
   font-size: 10px;
 }
 
-
-/* =====================================================
-   23. SETTINGS
-===================================================== */
+/* SETTINGS */
 
 .settings-section {
   background: var(--panel);
   border: 1px solid var(--border);
-
   padding: 18px;
   border-radius: var(--radius);
-
   margin-bottom: 15px;
 }
 
@@ -1823,10 +1453,8 @@ video.post-media {
   display: flex;
   flex-direction: column;
   gap: 5px;
-
   padding: 10px 0;
   border-bottom: 1px solid var(--border);
-
   font-size: 12px;
 }
 
@@ -1846,12 +1474,10 @@ video.post-media {
   display: flex;
   justify-content: space-between;
   align-items: center;
-
   gap: 12px;
 }
 
-.privacy-setting strong,
-.privacy-setting small {
+.privacy-setting strong,.privacy-setting small {
   display: block;
 }
 
@@ -1869,15 +1495,11 @@ video.post-media {
   flex: 0 0 19px;
 }
 
-#settingsLogoutBtn,
-#logoutBtn {
+#settingsLogoutBtn,#logoutBtn {
   width: 100%;
 }
 
-
-/* =====================================================
-   24. FOLLOW REQUESTS
-===================================================== */
+/* FOLLOW REQUESTS */
 
 #followRequestsList {
   display: flex;
@@ -1890,27 +1512,20 @@ video.post-media {
   align-items: center;
   flex-wrap: wrap;
   gap: 9px;
-
   padding: 11px;
-
   border-radius: 13px;
   background: var(--panel-light);
-
   border: 1px solid var(--border);
 }
 
 .request-avatar {
   flex: 0 0 40px;
-
   width: 40px;
   height: 40px;
-
   display: grid;
   place-items: center;
-
   border-radius: 50%;
   overflow: hidden;
-
   background: var(--purple-dark);
 }
 
@@ -1925,8 +1540,7 @@ video.post-media {
   min-width: 80px;
 }
 
-.request-info strong,
-.request-info small {
+.request-info strong,.request-info small {
   display: block;
 }
 
@@ -1944,50 +1558,35 @@ video.post-media {
   font-size: 10px;
 }
 
-
-/* =====================================================
-   25. BOTTOM NAVIGATION
-===================================================== */
+/* BOTTOM NAVIGATION */
 
 .bottom-nav {
   position: fixed;
   bottom: 0;
   left: 0;
-
   width: 100%;
   min-height: 67px;
-
   z-index: 500;
-
   display: flex;
   align-items: center;
   justify-content: space-around;
-
   padding: 8px 5px calc(8px + env(safe-area-inset-bottom));
-
-  background: rgba(15, 10, 24, 0.96);
+  background: rgba(15,10,24,.96);
   backdrop-filter: blur(20px);
-
   border-top: 1px solid var(--border);
 }
 
 .bottom-nav button {
   position: relative;
-
   min-width: 48px;
-
   padding: 5px 7px;
-
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-
   gap: 3px;
-
   background: transparent;
   color: var(--muted);
-
   box-shadow: none;
 }
 
@@ -2013,77 +1612,51 @@ video.post-media {
   position: absolute;
   top: -1px;
   right: 2px;
-
   min-width: 16px;
   height: 16px;
-
   padding: 2px 4px;
-
   display: grid;
   place-items: center;
-
   border-radius: 20px;
-
   background: var(--danger);
   color: white;
-
   font-size: 9px;
   font-weight: 800;
 }
 
-
-/* =====================================================
-   26. TOAST NOTIFICATIONS
-===================================================== */
+/* TOAST */
 
 #leakaToast {
   font-family: inherit;
-  animation: toastEnter 0.2s ease;
+  animation: toastEnter .2s ease;
 }
 
 @keyframes toastEnter {
-  from {
-    opacity: 0;
-    transform: translate(-50%, 10px);
-  }
-
-  to {
-    opacity: 1;
-    transform: translate(-50%, 0);
-  }
+  from { opacity: 0; transform: translate(-50%,10px); }
+  to { opacity: 1; transform: translate(-50%,0); }
 }
 
+/* ACCESSIBILITY */
 
-/* =====================================================
-   27. ACCESSIBILITY AND INTERACTION
-===================================================== */
-
-button:focus-visible,
-input:focus-visible,
+button:focus-visible,input:focus-visible,
 textarea:focus-visible {
   outline: 2px solid var(--purple-light);
   outline-offset: 3px;
 }
 
-button,
-label {
+button,label {
   -webkit-user-select: none;
   user-select: none;
 }
 
-input,
-textarea {
+input,textarea {
   -webkit-user-select: text;
   user-select: text;
 }
 
+/* SMALL PHONES */
 
-/* =====================================================
-   28. RESPONSIVE — SMALL PHONES
-===================================================== */
-
-@media (max-width: 380px) {
-
+@media (max-width:380px) {
   .page {
     padding-left: 11px;
     padding-right: 11px;
@@ -2116,23 +1689,18 @@ textarea {
     min-width: 42px;
     padding: 5px 3px;
   }
-
 }
 
+/* TABLETS AND DESKTOP */
 
-/* =====================================================
-   29. RESPONSIVE — TABLETS AND DESKTOP
-===================================================== */
-
-@media (min-width: 700px) {
-
+@media (min-width:700px) {
   .page {
     padding: 28px 24px 120px;
   }
 
   .top-header {
-    padding-left: max(25px, calc((100% - 760px) / 2));
-    padding-right: max(25px, calc((100% - 760px) / 2));
+    padding-left: max(25px,calc((100% - 760px)/2));
+    padding-right: max(25px,calc((100% - 760px)/2));
   }
 
   .post-card {
@@ -2146,36 +1714,34 @@ textarea {
   .bottom-nav {
     left: 50%;
     transform: translateX(-50%);
-
-    width: min(100%, 760px);
-
+    width: min(100%,760px);
     border: 1px solid var(--border);
     border-bottom: none;
-
     border-radius: 18px 18px 0 0;
   }
 
+  #storyViewer {
+    background: #08050d;
+  }
+
+  #storyViewer .story-viewer-content {
+    max-width: 440px;
+    left: 50%;
+    transform: translateX(-50%);
+  }
 }
 
+/* REDUCED MOTION */
 
-/* =====================================================
-   30. REDUCED MOTION
-===================================================== */
-
-@media (prefers-reduced-motion: reduce) {
-
+@media (prefers-reduced-motion:reduce) {
   *,
   *::before,
   *::after {
     scroll-behavior: auto !important;
-    animation-duration: 0.01ms !important;
+    animation-duration: .01ms !important;
     animation-iteration-count: 1 !important;
-    transition-duration: 0.01ms !important;
+    transition-duration: .01ms !important;
   }
-
 }
 
-
-/* =====================================================
-   END OF LEAKA STYLESHEET
-===================================================== */
+/* END LEAKA STYLESHEET */
