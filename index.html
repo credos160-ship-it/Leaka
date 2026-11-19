@@ -15,8 +15,10 @@
     <div class="logo">LEAKA 💜</div>
     <h2>Welcome to Leaka</h2>
     <p>Your world. Your people. Your moments.</p>
+
     <input type="email" id="email" placeholder="Your email">
     <input type="password" id="password" placeholder="Your password">
+
     <button id="loginBtn">Log In</button>
     <button id="signupBtn">Create Account</button>
     <p id="authMessage"></p>
@@ -26,8 +28,8 @@
 <div id="appContent" hidden>
 
   <header class="navbar">
-    <div class="logo">LEAKA 💜</div>
-    <span class="navbar-tagline">Your social universe</span>
+    <div class="logo">LEAKA<span>💜</span></div>
+    <div class="nav-tagline">Your world. Your people.</div>
   </header>
 
   <main id="feed" class="page active">
@@ -39,32 +41,24 @@
       </div>
     </div>
 
-    <section class="create-card story-card">
-      <h3>Stories ✨</h3>
-      <p class="muted">Share a moment with your people.</p>
+    <section id="createPostCard" class="create-card" hidden>
+      <div class="section-header">
+        <h3>Create a post ✨</h3>
+        <button id="closeCreatePost" class="close-create">×</button>
+      </div>
 
-      <input type="file" id="storyInput" accept="image/*,video/*" hidden>
+      <textarea id="caption" placeholder="What's happening?"></textarea>
 
-      <button id="createStoryBtn" class="story-add-btn">
-        <span>＋</span> Add Story
-      </button>
-    </section>
+      <input type="file" id="mediaInput"
+        accept="image/*,video/*" hidden>
 
-    <section class="create-card" id="createPostCard">
-      <h3>Create a post</h3>
-      <p class="muted">What's happening?</p>
-
-      <textarea id="caption" placeholder="Share something with LEAKA..."></textarea>
-
-      <label for="mediaInput" class="upload-media-btn">
-        <span>＋</span> Choose Photo or Video
+      <label for="mediaInput" class="upload-button">
+        <span>＋</span> Add photo or video
       </label>
-
-      <input type="file" id="mediaInput" accept="image/*,video/*" hidden>
 
       <div id="preview"></div>
 
-      <button id="postBtn">Publish ↗</button>
+      <button id="postBtn">Publish Post ↗</button>
     </section>
 
     <section class="feed-section">
@@ -130,6 +124,7 @@
       <h3>Edit Profile ✏️</h3>
 
       <label>Profile picture</label>
+      <div id="editAvatar">U</div>
       <input type="file" id="avatarInput" accept="image/*">
 
       <label>Cover photo</label>
@@ -176,7 +171,7 @@
         <input type="checkbox" id="privateAccount">
         Make my account private
       </label>
-      <p>People must send you a follow request before seeing your private posts.</p>
+      <p>People must send you a follow request before seeing your posts.</p>
     </section>
 
     <section class="settings-card">
@@ -193,6 +188,25 @@
 
   </main>
 
+  <!-- CREATE MENU -->
+
+  <div id="createMenu" hidden>
+    <button id="menuStoryBtn">
+      <span>◎</span>
+      Add Story
+    </button>
+
+    <button id="menuPostBtn">
+      <span>▣</span>
+      Create Post
+    </button>
+  </div>
+
+  <input type="file" id="storyInput"
+    accept="image/*,video/*" hidden>
+
+  <button id="createStoryBtn" hidden></button>
+
   <!-- BOTTOM NAVIGATION -->
 
   <nav class="bottom-nav">
@@ -204,15 +218,15 @@
 
     <button class="nav-item" data-page="searchPage">
       <span>⌕</span>
-      <small>Discover</small>
+      <small>Search</small>
     </button>
 
-    <button class="nav-item create-nav-btn" data-page="feed" data-scroll="createPostCard">
-      <span>＋</span>
+    <button id="createToggle" class="create-toggle">
+      +
     </button>
 
     <button class="nav-item" data-page="profile">
-      <span>♙</span>
+      <span>◉</span>
       <small>Profile</small>
     </button>
 
@@ -222,8 +236,6 @@
     </button>
 
   </nav>
-
-  <button id="profileBtn" hidden>U</button>
 
 </div>
 
