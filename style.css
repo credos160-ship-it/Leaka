@@ -2030,3 +2030,108 @@ input,textarea {
   pointer-events: auto !important;
   touch-action: manipulation;
 }
+
+/* TIKTOK STYLE COMMENT REPLIES */
+
+.leaka-comment {
+  margin-left: 0 !important;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+.leaka-comment-content {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.reply-comment {
+  margin-left: 0 !important;
+  padding-left: 0;
+  border-left: none;
+}
+
+.comment-replies {
+  margin-left: 0 !important;
+  padding-left: 0;
+  border-left: none;
+  max-width: 100%;
+}
+
+.replying-to {
+  display: inline-block;
+  margin-left: 6px;
+  color: #a78bfa;
+  font-size: 11px;
+  font-weight: 500;
+}
+/* LEAKA FINAL COMMENT STYLE FIX */
+
+/* Keep feed comments hidden outside the popup */
+.comments {
+  display: none !important;
+}
+
+/* Never show collapsed replies */
+.comment-replies[hidden] {
+  display: none !important;
+}
+
+/* Flat TikTok-style reply layout */
+.leaka-comment {
+  margin-left: 0 !important;
+  padding-left: 0 !important;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+.leaka-comment-content {
+  min-width: 0;
+  width: 100%;
+  overflow-wrap: anywhere;
+}
+
+.reply-comment {
+  margin: 8px 0 0 0 !important;
+  padding: 0 !important;
+  border: none !important;
+}
+
+.comment-replies {
+  margin: 8px 0 0 0 !important;
+  padding: 0 0 0 12px !important;
+  border-left: 1px solid #393044 !important;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+/* Reply target */
+.replying-to {
+  display: block;
+  margin: 3px 0;
+  color: #a78bfa;
+  font-size: 11px;
+}
+
+/* Replies button underneath comment */
+.view-replies-btn {
+  display: block !important;
+  margin: 7px 0 0 0 !important;
+  padding: 5px 0 !important;
+  background: transparent !important;
+  border: none !important;
+  color: #a78bfa !important;
+  font-size: 12px !important;
+  font-weight: 600;
+}
+
+/* Small creator badge */
+.creator-badge {
+  display: inline-block !important;
+  font-size: 9px !important;
+  padding: 2px 5px !important;
+  margin-left: 5px !important;
+  border-radius: 4px !important;
+  background: #713cff !important;
+  color: white !important;
+  font-weight: 700 !important;
+}
