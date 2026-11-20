@@ -55,6 +55,7 @@ const $ = id => document.getElementById(id);
 ========================================================= */
 
 
+
 function escapeHTML(value = "") {
   return String(value).replace(/[&<>"']/g, char => ({
     "&": "&amp;",
@@ -107,6 +108,7 @@ function showToast(message, duration = 3000) {
   }, duration);
 }
 
+
 function showEmpty(container, icon, heading, description) {
   if (!container) return;
 
@@ -118,6 +120,7 @@ function showEmpty(container, icon, heading, description) {
     </div>
   `;
 }
+
 
 function formatTime(date) {
   if (!date) return "";
@@ -142,6 +145,7 @@ function setButtonLoading(button, loading, originalText) {
   button.textContent = loading ? "Please wait..." : originalText;
 }
 
+
 function getAvatar(profile, size = "") {
   const url = profile?.avatar_url;
 
@@ -149,8 +153,11 @@ function getAvatar(profile, size = "") {
     return `<img src="${escapeHTML(url)}" alt="Avatar">`;
   }
 
-  return getInitial(profile?.display_name || profile?.username || "L");
+  return getInitial(
+    profile?.display_name || profile?.username || "L"
+  );
 }
+
 
 async function getMyProfile() {
   if (!currentUser) return null;
@@ -174,7 +181,8 @@ async function getMyProfile() {
    3. NAVIGATION
 ========================================================= */
 
-function navigateTo(page) {
+
+function navigateTo(page, addHistory = true) {
   const allowedPages = [
     "home",
     "search",
@@ -189,6 +197,14 @@ function navigateTo(page) {
   if (!currentUser) {
     showToast("Please log in first.");
     return;
+  }
+
+  if (addHistory && currentPage !== page) {
+    history.pushState(
+      { page },
+      "",
+      "#" + page
+    );
   }
 
   currentPage = page;
@@ -322,6 +338,7 @@ async function signUp() {
   }
 }
 
+
 async function signIn() {
   const email = $("email")?.value.trim();
   const password = $("password")?.value;
@@ -335,21 +352,28 @@ async function signIn() {
 
   setButtonLoading(button, true, "Log In");
 
-  const { data, error } = await db.auth.signInWithPassword({
-    email,
-    password
-  });
+  try {
+    const { data, error } = await db.auth.signInWithPassword({
+      email,
+      password
+    });
 
-  setButtonLoading(button, false, "Log In");
+    if (error) throw error;
 
-  if (error) {
-    $("authMessage").textContent = error.message;
-    return;
+    currentUser = data.user;
+
+    await initializeApp();
+
+  } catch (error) {
+    console.error("LOGIN ERROR:", error);
+
+    if ($("authMessage")) {
+      $("authMessage").textContent = error.message;
+    }
+
+  } finally {
+    setButtonLoading(button, false, "Log In");
   }
-
-  currentUser = data.user;
-
-  await initializeApp();
 }
 
 async function signOut() {
@@ -374,6 +398,7 @@ async function signOut() {
 }
 
 
+
 function initializeAuthentication() {
   $("loginBtn")?.addEventListener("click", signIn);
   $("signupBtn")?.addEventListener("click", signUp);
@@ -394,8 +419,8 @@ function initializeAuthentication() {
       if ($("appContent")) $("appContent").hidden = true;
     }
 
-    if (event === "SIGNED_IN" || event === "TOKEN_REFRESHED") {
-      currentUser = session?.user || null;
+    if (session?.user) {
+      currentUser = session.user;
     }
   });
 }
@@ -405,49 +430,65 @@ function initializeAuthentication() {
    5. APP INITIALIZATION
 ========================================================= */
 
+
 async function initializeApp() {
   if (!currentUser) return;
 
   $("auth").hidden = true;
   $("appContent").hidden = false;
 
-  const profile = await getMyProfile();
+  try {
+    const profile = await getMyProfile();
 
-  if (!profile) {
-    showToast(
-      "Your profile could not be loaded. Check your profiles table and permissions."
-    );
-    return;
+    if (!profile) {
+      throw new Error(
+        "Your profile could not be loaded. Check your profiles table and permissions."
+      );
+    }
+
+    await loadFeed();
+    await loadMyProfilePage();
+
+    closeCreatePostModal();
+
+    await loadStories();
+    await loadNotifications();
+    await loadFollowRequests();
+    await loadSettings();
+
+    navigateTo("home");
+
+  } catch (error) {
+    console.error("APP INITIALIZATION ERROR:", error);
+    showToast(error.message || "Could not initialize LEAKA.");
   }
-
- await loadFeed();
-await loadMyProfilePage();
-
-closeCreatePostModal();
-  await loadStories();
-  await loadNotifications();
-  await loadFollowRequests();
-  await loadSettings();
-
-  navigateTo("home");
 }
+
+
 
 async function checkSession() {
-  const { data, error } = await db.auth.getSession();
+  try {
+    const { data, error } = await db.auth.getSession();
 
-  if (error) {
-    console.error(error);
-    return;
-  }
+    if (error) throw error;
 
-  if (data.session) {
-    currentUser = data.session.user;
-    await initializeApp();
-  } else {
-    $("auth").hidden = false;
-    $("appContent").hidden = true;
+    if (data.session) {
+      currentUser = data.session.user;
+      await initializeApp();
+    } else {
+      currentUser = null;
+      currentProfile = null;
+
+      $("auth").hidden = false;
+      $("appContent").hidden = true;
+    }
+
+  } catch (error) {
+    console.error("SESSION ERROR:", error);
+    showToast("Could not check your login session: " + error.message);
   }
 }
+
 
 
 /* =========================================================
@@ -483,8 +524,9 @@ async function uploadFile(file, folder) {
 
   const extension = file.name.split(".").pop().toLowerCase();
 
-  const path =
-  `${folder}/${currentUser.id}/${Date.now()}-${crypto.randomUUID()}.${extension}`;
+  
+const path = `${folder}/${currentUser.id}/${Date.now()}-${crypto.randomUUID()}.${extension}`;
+
 
   const { error } = await db.storage
     .from(STORAGE_BUCKET)
@@ -869,6 +911,7 @@ const replyingTo = parentProfile
          </small>`
       : ""}
 
+
             ${isCreator
               ? `<span class="creator-badge">CREATOR</span>`
               : ""}
@@ -1030,7 +1073,7 @@ async function toggleLike(postId) {
   // Update the button immediately
   likeButton.classList.toggle("liked", !wasLiked);
   likeButton.textContent =
-    `${wasLiked ? "♡" : "♥"} ${Math.max(0, newCount)}`;
+  `${wasLiked ? "♡" : "♥"} ${Math.max(0, newCount)}`;
 
   const { data: existing, error: findError } = await db
     .from("likes")
@@ -1084,8 +1127,8 @@ async function toggleLike(postId) {
 async function toggleCommentLike(commentId) {
   const buttons = [
     ...document.querySelectorAll(
-      `[data-like-comment="${commentId}"]`
-    )
+  `[data-like-comment="${commentId}"]`
+)
   ];
 
   if (!buttons.length) return;
@@ -1211,11 +1254,11 @@ async function submitCommentReply(commentId, button) {
 
     // Check if current user owns the post
     const postElement = document.querySelector(
-      `[data-comment-id="${commentId}"]`
-    )?.closest(".post-card");
+  `[data-submit-comment="${parent.post_id}"]`
+)?.closest(".post-card");
 
-    const isCreator =
-      postElement?.dataset?.creatorId === currentUser.id;
+const isCreator =
+  postElement?.dataset?.creatorId === currentUser.id;
 
     // Create reply element safely
     const replyElement = document.createElement("div");
@@ -1291,11 +1334,18 @@ async function submitCommentReply(commentId, button) {
     replyElement.appendChild(contentElement);
 
     // Insert into the correct parent comment
-    document.querySelectorAll(
-      `[data-comment-id="${commentId}"] > .leaka-comment-content > .comment-replies`
-    ).forEach(container => {
-      container.appendChild(replyElement.cloneNode(true));
-    });
+    const parentComment = document.querySelector(
+  `[data-comment-id="${commentId}"]`
+);
+
+const repliesContainer = parentComment?.querySelector(
+  ":scope > .leaka-comment-content > .comment-replies"
+);
+
+if (repliesContainer) {
+  repliesContainer.hidden = false;
+  repliesContainer.appendChild(replyElement);
+}
 
     input.value = "";
     composer.hidden = true;
@@ -1314,9 +1364,6 @@ async function submitCommentReply(commentId, button) {
 /* =========================================================
    11. COMMENTS
 ========================================================= */
-
-
-
 
 async function submitComment(postId) {
   const overlay = $("leakaCommentsOverlay");
@@ -1634,7 +1681,11 @@ async function saveProfile() {
    16. PROFILE TABS
 ========================================================= */
 
+
 function initializeProfileTabs() {
+
+  // EXISTING POSTS AND MEDIA TABS
+
   document.querySelectorAll("[data-profile-tab]").forEach(button => {
     button.addEventListener("click", () => {
       currentProfileTab = button.dataset.profileTab;
@@ -1646,6 +1697,162 @@ function initializeProfileTabs() {
       loadProfilePosts();
     });
   });
+
+  // LOAD FOLLOWERS OR FOLLOWING
+
+  async function loadProfileFollowList(type) {
+    if (!currentUser) return;
+
+    const container = $("profileFollowList");
+    const title = $("profileFollowTitle");
+
+    if (!container || !title) return;
+
+    title.textContent =
+      type === "followers" ? "Followers" : "Following";
+
+    container.innerHTML = `
+      <div class="empty-state">
+        <div class="leaka-spinner"></div>
+        <h3>Loading...</h3>
+      </div>
+    `;
+
+    let query;
+
+    if (type === "followers") {
+      query = db.from("follows")
+        .select("follower_id")
+        .eq("following_id", currentUser.id);
+    } else {
+      query = db.from("follows")
+        .select("following_id")
+        .eq("follower_id", currentUser.id);
+    }
+
+    const { data, error } = await query;
+
+    if (error) {
+      showEmpty(
+        container,
+        "!",
+        "Unable to load",
+        error.message
+      );
+      return;
+    }
+
+    if (!data?.length) {
+      showEmpty(
+        container,
+        "♧",
+        type === "followers"
+          ? "No followers yet"
+          : "Not following anyone",
+        type === "followers"
+          ? "People who follow you will appear here."
+          : "People you follow will appear here."
+      );
+      return;
+    }
+
+    const ids = data.map(item =>
+      type === "followers"
+        ? item.follower_id
+        : item.following_id
+    );
+
+    const { data: users, error: profileError } = await db
+      .from("profiles")
+      .select("*")
+      .in("id", ids);
+
+    if (profileError) {
+      showEmpty(
+        container,
+        "!",
+        "Unable to load accounts",
+        profileError.message
+      );
+      return;
+    }
+
+    container.innerHTML = "";
+
+    for (const user of users || []) {
+
+      const item = document.createElement("button");
+
+      item.type = "button";
+      item.className = "request-list-item";
+      item.dataset.openProfile = user.id;
+
+      item.innerHTML = `
+        <div class="request-avatar">
+          ${getAvatar(user)}
+        </div>
+
+        <div class="request-info">
+          <strong>
+            ${escapeHTML(user.display_name || user.username || "User")}
+          </strong>
+
+          <small>
+            @${escapeHTML(user.username || "")}
+          </small>
+        </div>
+
+        <span class="profile-user-arrow">›</span>
+      `;
+
+      container.appendChild(item);
+    }
+
+    if (!container.children.length) {
+      showEmpty(
+        container,
+        "♧",
+        "No accounts found",
+        "There are no accounts to display."
+      );
+    }
+  }
+
+  // OPEN FOLLOWERS
+
+  $("openFollowersBtn")?.addEventListener("click", async () => {
+
+    $("profilePosts").hidden = true;
+    document.querySelector(".profile-tabs").hidden = true;
+
+    $("profileFollowViewer").hidden = false;
+
+    await loadProfileFollowList("followers");
+  });
+
+  // OPEN FOLLOWING
+
+  $("openFollowingBtn")?.addEventListener("click", async () => {
+
+    $("profilePosts").hidden = true;
+    document.querySelector(".profile-tabs").hidden = true;
+
+    $("profileFollowViewer").hidden = false;
+
+    await loadProfileFollowList("following");
+  });
+
+  // RETURN TO PROFILE
+
+  $("backToProfileBtn")?.addEventListener("click", () => {
+
+    $("profileFollowViewer").hidden = true;
+
+    $("profilePosts").hidden = false;
+    document.querySelector(".profile-tabs").hidden = false;
+
+  });
+
 }
 
 
@@ -1911,6 +2118,7 @@ async function openPublicProfile(userId) {
           ${escapeHTML(user.bio || "")}
         </p>
 
+  
         <div class="public-profile-stats">
 
           <div>
@@ -1918,15 +2126,25 @@ async function openPublicProfile(userId) {
             <span>Posts</span>
           </div>
 
-          <div>
+          <button
+            type="button"
+            class="public-profile-stat-button"
+            data-public-follow-list="followers"
+            data-user-id="${escapeHTML(userId)}"
+          >
             <strong>${followers.count || 0}</strong>
             <span>Followers</span>
-          </div>
+          </button>
 
-          <div>
+          <button
+            type="button"
+            class="public-profile-stat-button"
+            data-public-follow-list="following"
+            data-user-id="${escapeHTML(userId)}"
+          >
             <strong>${followings.count || 0}</strong>
             <span>Following</span>
-          </div>
+          </button>
 
         </div>
 
@@ -1943,14 +2161,152 @@ async function openPublicProfile(userId) {
     </div>
   `;
 
-  overlay.addEventListener("click", event => {
-    if (
-      event.target === overlay ||
-      event.target.closest(".public-profile-close")
-    ) {
-      overlay.hidden = true;
-    }
-  }, { once: true });
+  
+
+overlay.onclick = async event => {
+
+  // CLOSE PUBLIC PROFILE
+
+if (
+  event.target === overlay ||
+  event.target.closest(".public-profile-close")
+) {
+  overlay.hidden = true;
+  overlay.dataset.historyOpen = "";
+
+  if (history.state?.publicProfile) {
+    history.back();
+  }
+
+  return;
+}
+
+  // RETURN FROM FOLLOW LIST
+
+  if (event.target.closest("[data-public-follow-back]")) {
+    const viewer = overlay.querySelector(".public-profile-follow-view");
+    const body = overlay.querySelector(".public-profile-body");
+
+    viewer?.remove();
+
+    if (body) body.hidden = false;
+
+    return;
+  }
+
+  // OPEN FOLLOWERS OR FOLLOWING
+
+  const followButton = event.target.closest("[data-public-follow-list]");
+
+  if (!followButton) return;
+
+  const type = followButton.dataset.publicFollowList;
+  const targetUserId = followButton.dataset.userId;
+
+  const body = overlay.querySelector(".public-profile-body");
+
+  if (!body) return;
+
+  if (isPrivate && !following) {
+    showToast("Follow this private account to view its lists.");
+    return;
+  }
+
+  let viewer = overlay.querySelector(".public-profile-follow-view");
+
+  if (!viewer) {
+    viewer = document.createElement("div");
+    viewer.className = "public-profile-follow-view";
+    overlay.querySelector(".public-profile-card").appendChild(viewer);
+  }
+
+  body.hidden = true;
+
+  viewer.innerHTML = `
+    <div class="public-follow-header">
+      <button type="button" data-public-follow-back>
+        ← Back
+      </button>
+
+      <h3>${type === "followers" ? "Followers" : "Following"}</h3>
+    </div>
+
+    <div class="public-follow-list">
+      <div class="empty-state">
+        <div class="leaka-spinner"></div>
+        <h3>Loading...</h3>
+      </div>
+    </div>
+  `;
+
+  const list = viewer.querySelector(".public-follow-list");
+
+  const { data, error } = await db
+    .from("follows")
+    .select(type === "followers" ? "follower_id" : "following_id")
+    .eq(
+      type === "followers" ? "following_id" : "follower_id",
+      targetUserId
+    );
+
+  if (error) {
+    showEmpty(list, "!", "Unable to load", error.message);
+    return;
+  }
+
+  if (!data?.length) {
+    showEmpty(
+      list,
+      "♧",
+      type === "followers" ? "No followers yet" : "Not following anyone",
+      "There are no accounts to display."
+    );
+    return;
+  }
+
+  const ids = data.map(item =>
+    type === "followers" ? item.follower_id : item.following_id
+  );
+
+  const { data: users, error: profileError } = await db
+    .from("profiles")
+    .select("*")
+    .in("id", ids);
+
+  if (profileError) {
+    showEmpty(list, "!", "Unable to load accounts", profileError.message);
+    return;
+  }
+
+  list.innerHTML = "";
+
+  for (const account of users || []) {
+    const item = document.createElement("button");
+
+    item.type = "button";
+    item.className = "request-list-item";
+    item.dataset.openProfile = account.id;
+
+    item.innerHTML = `
+      <div class="request-avatar">
+        ${getAvatar(account)}
+      </div>
+
+      <div class="request-info">
+        <strong>
+          ${escapeHTML(account.display_name || account.username || "User")}
+        </strong>
+
+        <small>@${escapeHTML(account.username || "")}</small>
+      </div>
+
+      <span class="profile-user-arrow">›</span>
+    `;
+
+    list.appendChild(item);
+  }
+};
+
 
   $("publicFollowBtn")?.addEventListener("click", async () => {
     await toggleFollow(user);
@@ -2069,18 +2425,21 @@ async function loadFollowRequests() {
     return;
   }
 
+  const target = $("receivedRequestsList");
+
   if (!requests?.length) {
     showEmpty(
-      container,
+      target || container,
       "♧",
       "No requests yet",
       "New follow requests will appear here."
     );
-
     return;
   }
 
   container.innerHTML = "";
+
+  if (target) target.innerHTML = "";
 
   for (const request of requests) {
     const { data: user } = await db
@@ -2092,7 +2451,6 @@ async function loadFollowRequests() {
     if (!user) continue;
 
     const item = document.createElement("div");
-
     item.className = "request-list-item";
 
     item.innerHTML = `
@@ -2118,6 +2476,14 @@ async function loadFollowRequests() {
     `;
 
     container.appendChild(item);
+
+    if (target) {
+      target.appendChild(item.cloneNode(true));
+    }
+  }
+
+  if (target && !target.children.length) {
+    showEmpty(target, "♧", "No requests yet", "New requests will appear here.");
   }
 }
 
@@ -2815,9 +3181,11 @@ async function sendStoryReply() {
 
 
 function openComments(postId) {
-  const card = document
-    .querySelector(`[data-like-post="${postId}"]`)
-    ?.closest(".post-card");
+  
+const card = document
+  .querySelector(`[data-like-post="${postId}"]`)
+  ?.closest(".post-card");
+
 
   if (!card) return;
 
@@ -2887,7 +3255,15 @@ function openComments(postId) {
 
     </div>
   `;
+if (!overlay.dataset.historyOpen) {
+  history.pushState(
+    { publicProfile: true },
+    "",
+    "#public-profile"
+  );
 
+  overlay.dataset.historyOpen = "true";
+}
   overlay.hidden = false;
   document.body.style.overflow = "hidden";
 
@@ -2930,8 +3306,6 @@ function openComments(postId) {
 ========================================================= */
 
 
-
-
 function initializeGlobalEvents() {
 
   document.addEventListener("click", async event => {
@@ -2961,6 +3335,37 @@ function initializeGlobalEvents() {
 
     if (deleteButton) {
       await deletePost(deleteButton.dataset.deletePost);
+      return;
+    }
+
+    // UNFOLLOW USER
+    const unfollowButton = event.target.closest("[data-unfollow]");
+
+    if (unfollowButton) {
+      const userId = unfollowButton.dataset.unfollow;
+
+      if (!confirm("Are you sure you want to unfollow this user?")) {
+        return;
+      }
+
+      unfollowButton.disabled = true;
+
+      const { error } = await db
+        .from("follows")
+        .delete()
+        .eq("follower_id", currentUser.id)
+        .eq("following_id", userId);
+
+      if (error) {
+        showToast(error.message);
+        unfollowButton.disabled = false;
+        return;
+      }
+
+      showToast("Unfollowed successfully.");
+
+      await loadFollowManagement("following");
+      await loadMyProfilePage();
       return;
     }
 
@@ -3018,24 +3423,24 @@ function initializeGlobalEvents() {
       return;
     }
 
-    // USE THE MAIN COMMENT BOX TO REPLY
+    // USE MAIN COMMENT BOX TO REPLY
     const replyButton = event.target.closest("[data-reply-comment]");
 
     if (replyButton) {
       const comment = replyButton.closest(".leaka-comment");
       const postCard = replyButton.closest(".post-card");
 
-const postId =
-  postCard?.querySelector("[data-submit-comment]")?.dataset.submitComment ||
-  $("activeCommentsList")?.dataset.postId;
+      const postId =
+        postCard?.querySelector("[data-submit-comment]")?.dataset.submitComment ||
+        $("activeCommentsList")?.dataset.postId;
 
-if (!comment || !postId) return;
+      if (!comment || !postId) return;
 
       const input =
         $("activeCommentInput") ||
-        (postId ? $("comment-input-" + postId) : null);
+        $("comment-input-" + postId);
 
-      if (!input || !postId) {
+      if (!input) {
         showToast("Comment box unavailable. Open the comments first.");
         return;
       }
@@ -3085,7 +3490,6 @@ if (!comment || !postId) return;
 
 
 
-
 /* =========================================================
    28. START APPLICATION
 ========================================================= */
@@ -3093,6 +3497,7 @@ if (!comment || !postId) return;
 async function startLeaka() {
   initializeAuthentication();
   initializeNavigation();
+  initializeActivityTabs();
   initializePostPreview();
   initializeProfileEditor();
   initializeProfileTabs();
@@ -3129,5 +3534,185 @@ function closeComments() {
     commentVideoToResume = null;
   }
 }
+
+function initializeActivityTabs() {
+
+  document.querySelectorAll("[data-activity-tab]").forEach(button => {
+
+    button.addEventListener("click", () => {
+
+      const target = button.dataset.activityTab;
+
+      document.querySelectorAll("[data-activity-tab]").forEach(tab => {
+        tab.classList.toggle("active", tab === button);
+      });
+
+      $("activityNotifications").hidden = target !== "notifications";
+      $("activityFollows").hidden = target !== "follows";
+
+      if (target === "follows") {
+        loadFollowManagement("received");
+      }
+
+    });
+
+  });
+
+  document.querySelectorAll("[data-follow-view]").forEach(button => {
+
+    button.addEventListener("click", () => {
+
+      const target = button.dataset.followView;
+
+      document.querySelectorAll("[data-follow-view]").forEach(tab => {
+        tab.classList.toggle("active", tab === button);
+      });
+
+      document.querySelectorAll("[data-follow-list]").forEach(list => {
+        list.hidden = list.dataset.followList !== target;
+      });
+
+      loadFollowManagement(target);
+
+    });
+
+  });
+
+}
+
+async function loadFollowManagement(type) {
+  if (!currentUser) return;
+
+  const containers = {
+    followers: $("followersList"),
+    following: $("followingList"),
+    received: $("receivedRequestsList"),
+    sent: $("sentRequestsList")
+  };
+
+  const container = containers[type];
+
+  if (!container) return;
+
+  container.innerHTML = `
+    <div class="empty-state">
+      <div class="leaka-spinner"></div>
+      <h3>Loading...</h3>
+    </div>
+  `;
+
+  if (type === "received") {
+    await loadFollowRequests();
+
+    const oldContainer = $("followRequestsList");
+
+    if (oldContainer && oldContainer.children.length) {
+      container.innerHTML = oldContainer.innerHTML;
+    }
+
+    return;
+  }
+
+  let query;
+
+  if (type === "followers") {
+    query = db.from("follows")
+      .select("follower_id")
+      .eq("following_id", currentUser.id);
+  }
+
+  if (type === "following") {
+    query = db.from("follows")
+      .select("following_id")
+      .eq("follower_id", currentUser.id);
+  }
+
+  if (type === "sent") {
+    query = db.from("follow_requests")
+      .select("receiver_id, status, created_at")
+      .eq("requester_id", currentUser.id)
+      .eq("status", "pending")
+      .order("created_at", { ascending: false });
+  }
+
+  const { data, error } = await query;
+
+  if (error) {
+    showEmpty(container, "!", "Unable to load", error.message);
+    return;
+  }
+
+  if (!data?.length) {
+    const messages = {
+      followers: ["No followers yet", "People who follow you will appear here."],
+      following: ["Not following anyone", "People you follow will appear here."],
+      sent: ["No sent requests", "Follow requests you send will appear here."]
+    };
+
+    showEmpty(container, "♧", messages[type][0], messages[type][1]);
+    return;
+  }
+
+  container.innerHTML = "";
+
+  const ids = data.map(item =>
+    type === "followers"
+      ? item.follower_id
+      : type === "following"
+        ? item.following_id
+        : item.receiver_id
+  );
+
+  const { data: users, error: profileError } = await db
+    .from("profiles")
+    .select("*")
+    .in("id", ids);
+
+  if (profileError) {
+    showEmpty(container, "!", "Unable to load users", profileError.message);
+    return;
+  }
+
+  for (const user of users || []) {
+    const item = document.createElement("div");
+    item.className = "request-list-item";
+
+    item.innerHTML = `
+      <div class="request-avatar">
+        ${getAvatar(user)}
+      </div>
+
+      <div class="request-info">
+        <strong>${escapeHTML(user.display_name || user.username || "User")}</strong>
+        <small>@${escapeHTML(user.username || "")}</small>
+      </div>
+
+      ${
+        type === "following"
+          ? `<button class="danger" data-unfollow="${escapeHTML(user.id)}">Unfollow</button>`
+          : type === "sent"
+            ? `<span class="request-status">Pending</span>`
+            : ""
+      }
+    `;
+
+    container.appendChild(item);
+  }
+}
+
+
+window.addEventListener("popstate", event => {
+  const overlay = $("publicProfileOverlay");
+
+  if (overlay && !overlay.hidden) {
+    overlay.hidden = true;
+    overlay.dataset.historyOpen = "";
+  }
+
+  const page = event.state?.page || currentPage || "home";
+
+  navigateTo(page, false);
+});
+
 
 })();
