@@ -770,6 +770,18 @@ async function loadFeed() {
 
       const commenter = commentProfiles[comment.user_id];
 
+     const parentComment = postComments.find(
+  item => item.id === comment.parent_comment_id
+);
+
+const parentProfile = parentComment
+  ? commentProfiles[parentComment.user_id]
+  : null;
+
+const replyingTo = parentProfile
+  ? parentProfile.username || parentProfile.display_name || "User"
+  : null;
+
       const username =
         commenter?.username ||
         commenter?.display_name ||
@@ -809,15 +821,20 @@ async function loadFeed() {
         `
         : "";
 
-      return `
+        return `
         <div
           class="leaka-comment ${depth > 0 ? "reply-comment" : ""}"
-          data-comment-id="${escapeHTML(comment.id)}"
-          style="margin-left:${Math.min(depth * 18, 90)}px">
+          data-comment-id="${escapeHTML(comment.id)}">
 
           <div class="leaka-comment-content">
 
             <strong>${escapeHTML(username)}</strong>
+
+            ${replyingTo
+              ? `<small class="replying-to">
+                   Replying to @${escapeHTML(replyingTo)}
+                 </small>`
+              : ""}
 
             ${isCreator
               ? `<span class="creator-badge">CREATOR</span>`
