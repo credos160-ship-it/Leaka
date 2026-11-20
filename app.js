@@ -41,6 +41,7 @@ let currentStoryIndex = 0;
 let storyTimer = null;
 let storyPaused = false;
 let storyTouchStartX = 0;
+let commentVideoToResume = null;
 
 let selectedMedia = null;
 let currentProfileTab = "posts";
@@ -792,44 +793,81 @@ async function loadFeed() {
    10. LIKE POSTS
 ========================================================= */
 
+
 async function toggleLike(postId) {
+  const card = document
+    .querySelector(`[data-like-post="${postId}"]`)
+    ?.closest(".post-card");
+
+  const likeButton = card?.querySelector(
+    "[data-like-post]"
+  );
+
+  if (!likeButton) return;
+
+  likeButton.disabled = true;
+
+  const wasLiked = likeButton.classList.contains("liked");
+
+  const currentCount = Number(
+    likeButton.textContent.match(/\d+/)?.[0] || 0
+  );
+
+  const newCount = wasLiked
+    ? currentCount - 1
+    : currentCount + 1;
+
+  // Update the button immediately
+  likeButton.classList.toggle("liked", !wasLiked);
+  likeButton.textContent =
+    `${wasLiked ? "♡" : "♥"} ${Math.max(0, newCount)}`;
+
   const { data: existing, error: findError } = await db
     .from("likes")
-    .select("id")
+    .select("post_id, user_id")
     .eq("post_id", postId)
     .eq("user_id", currentUser.id)
     .maybeSingle();
 
   if (findError) {
-    showToast("Could not check like.");
+    console.error("LIKE CHECK ERROR:", findError);
+    showToast(findError.message);
+
+    likeButton.classList.toggle("liked", wasLiked);
+    likeButton.textContent =
+      `${wasLiked ? "♥" : "♡"} ${currentCount}`;
+
+    likeButton.disabled = false;
     return;
   }
 
+  let error;
+
   if (existing) {
-    const { error } = await db
+    ({ error } = await db
       .from("likes")
       .delete()
-      .eq("id", existing.id);
-
-    if (error) {
-      showToast(error.message);
-      return;
-    }
+      .eq("post_id", postId)
+      .eq("user_id", currentUser.id));
   } else {
-    const { error } = await db
+    ({ error } = await db
       .from("likes")
       .insert({
         post_id: postId,
         user_id: currentUser.id
-      });
-
-    if (error) {
-      showToast(error.message);
-      return;
-    }
+      }));
   }
 
-  await loadFeed();
+  if (error) {
+    console.error("LIKE ERROR:", error);
+    showToast(error.message);
+
+    likeButton.classList.toggle("liked", wasLiked);
+    likeButton.textContent =
+      `${wasLiked ? "♥" : "♡"} ${currentCount}`;
+  }
+
+  likeButton.disabled = false;
 }
 
 
@@ -838,30 +876,91 @@ async function toggleLike(postId) {
 ========================================================= */
 
 async function submitComment(postId) {
-  const input = $("comment-input-" + postId);
+  const input = $("activeCommentInput") ||
+    $("comment-input-" + postId);
+
   const content = input?.value.trim();
 
   if (!content) return;
 
-  const { error } = await db
+  const sendButton = $("activeCommentSend");
+
+  if (sendButton) sendButton.disabled = true;
+
+  const { data: comment, error } = await db
     .from("comments")
     .insert({
       post_id: postId,
       user_id: currentUser.id,
       content
-    });
+    })
+    .select()
+    .single();
 
   if (error) {
     console.error(error);
     showToast("Could not send comment: " + error.message);
+
+    if (sendButton) sendButton.disabled = false;
     return;
   }
 
+  const commentElement = document.createElement("p");
+
+  const username = document.createElement("strong");
+  username.textContent =
+    (currentProfile?.username || "You") + ": ";
+
+  commentElement.appendChild(username);
+  commentElement.appendChild(
+    document.createTextNode(comment.content)
+  );
+
+  const activeList = $("activeCommentsList");
+
+  if (activeList) {
+    activeList.appendChild(commentElement.cloneNode(true));
+    activeList.scrollTop = activeList.scrollHeight;
+  }
+
+  const originalList = $("comments-" + postId);
+
+  if (originalList) {
+    originalList.appendChild(commentElement);
+  }
+
+  const card = input.closest(".post-card") ||
+    document.querySelector(
+      `[data-like-post="${postId}"]`
+    )?.closest(".post-card");
+
+  const commentButton = card?.querySelector(
+    "[data-focus-comment]"
+  );
+
+  if (commentButton) {
+    const count = Number(
+      commentButton.textContent.match(/\d+/)?.[0] || 0
+    );
+
+    commentButton.textContent = "💬 " + (count + 1);
+  }
+
+  const heading = document.querySelector(
+    "#leakaCommentsOverlay .leaka-comments-header h3"
+  );
+
+  if (heading && commentButton) {
+    heading.textContent = "Comments (" +
+      commentButton.textContent.match(/\d+/)?.[0] + ")";
+  }
+
+  input.value = "";
+
+  if (sendButton) sendButton.disabled = false;
+
   showToast("Comment added!");
-
-  await loadFeed();
 }
-
 
 /* =========================================================
    12. DELETE POSTS
@@ -2299,11 +2398,122 @@ async function sendStoryReply() {
 }
 
 
+function openComments(postId) {
+  const card = document
+    .querySelector(`[data-like-post="${postId}"]`)
+    ?.closest(".post-card");
+
+  if (!card) return;
+
+  let overlay = $("leakaCommentsOverlay");
+
+  if (!overlay) {
+    overlay = document.createElement("div");
+    overlay.id = "leakaCommentsOverlay";
+    document.body.appendChild(overlay);
+  }
+
+  // Pause the video if it is currently playing
+  const video = card.querySelector("video");
+
+  commentVideoToResume =
+    video && !video.paused ? video : null;
+
+  if (video && !video.paused) {
+    video.pause();
+  }
+
+  const comments = card.querySelector(".comments");
+  const commentButton = card.querySelector("[data-focus-comment]");
+
+  const count = Number(
+    commentButton?.textContent.match(/\d+/)?.[0] || 0
+  );
+
+  overlay.innerHTML = `
+    <div class="leaka-comments-sheet">
+
+      <div class="leaka-comments-header">
+        <h3>Comments (${count})</h3>
+
+        <button
+          type="button"
+          class="leaka-comments-close"
+          id="closeLeakaComments"
+        >×</button>
+      </div>
+
+      <div class="leaka-comments-list" id="activeCommentsList">
+        ${comments?.innerHTML || ""}
+      </div>
+
+      <div class="leaka-comments-input-area">
+
+        <input
+          type="text"
+          id="activeCommentInput"
+          placeholder="Write a comment..."
+          maxlength="1000"
+        >
+
+        <button
+          type="button"
+          id="activeCommentSend"
+        >➤</button>
+
+      </div>
+
+    </div>
+  `;
+
+  overlay.hidden = false;
+  document.body.style.overflow = "hidden";
+
+  $("closeLeakaComments").addEventListener(
+    "click",
+    closeComments
+  );
+
+ overlay.onclick = event => {
+  if (event.target === overlay) {
+    closeComments();
+  }
+};
+
+  $("activeCommentSend").addEventListener("click", () => {
+    submitComment(postId);
+  });
+
+  $("activeCommentInput").addEventListener("keydown", event => {
+    if (event.key === "Enter") {
+      submitComment(postId);
+    }
+  });
+
+  $("activeCommentInput").focus();
+}
+
+function closeComments() {
+  const overlay = $("leakaCommentsOverlay");
+
+  if (overlay) {
+    overlay.hidden = true;
+  }
+
+  document.body.style.overflow = "";
+
+  if (commentVideoToResume) {
+    commentVideoToResume.play().catch(() => {});
+    commentVideoToResume = null;
+  }
+}
+
 /* =========================================================
    27. GLOBAL CLICK HANDLERS
 ========================================================= */
 
 function initializeGlobalEvents() {
+
   document.addEventListener("click", async event => {
 
     const likeButton = event.target.closest("[data-like-post]");
@@ -2323,9 +2533,7 @@ function initializeGlobalEvents() {
     const focusComment = event.target.closest("[data-focus-comment]");
 
     if (focusComment) {
-      const input = $("comment-input-" + focusComment.dataset.focusComment);
-
-      input?.focus();
+      openComments(focusComment.dataset.focusComment);
       return;
     }
 
@@ -2343,7 +2551,6 @@ function initializeGlobalEvents() {
         acceptButton.dataset.acceptRequest,
         true
       );
-
       return;
     }
 
@@ -2354,7 +2561,6 @@ function initializeGlobalEvents() {
         declineButton.dataset.declineRequest,
         false
       );
-
       return;
     }
 
@@ -2376,12 +2582,21 @@ function initializeGlobalEvents() {
   });
 
   document.addEventListener("keydown", event => {
+
     if ($("storyViewer") && !$("storyViewer").hidden) {
       if (event.key === "Escape") closeStoryViewer();
       if (event.key === "ArrowRight") nextStory();
       if (event.key === "ArrowLeft") previousStory();
     }
+
+    if ($("leakaCommentsOverlay") &&
+        !$("leakaCommentsOverlay").hidden &&
+        event.key === "Escape") {
+      closeComments();
+    }
+
   });
+
 }
 
 
@@ -2413,5 +2628,4 @@ if (document.readyState === "loading") {
 } else {
   startLeaka();
 }
-
 })();
