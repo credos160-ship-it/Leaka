@@ -140,48 +140,57 @@
         </section>
 
 
-        <!-- CREATE POST -->
+      
+<!-- ================= CREATE POST MODAL ================= -->
 
-        <section class="create-post-card">
+<div id="createPostModal" class="create-post-modal" hidden>
 
-          <div class="create-post-heading">
-            <h3>Create a post</h3>
-          </div>
+  <div class="create-post-backdrop" data-close-create-post></div>
 
-          <textarea
-            id="caption"
-            placeholder="What's happening?"
-            maxlength="3000"
-          ></textarea>
+  <section class="create-post-card" role="dialog" aria-modal="true" aria-labelledby="createPostTitle">
 
-          <div id="preview" class="media-preview"></div>
+    <div class="create-post-heading">
+      <h3 id="createPostTitle">Create a post</h3>
 
-          <div class="create-post-actions">
+      <button
+        type="button"
+        class="close-create-post"
+        data-close-create-post
+        aria-label="Close"
+      >×</button>
+    </div>
 
-            <label
-              for="mediaInput"
-              class="media-select"
-            >
-              📷 Add Photo / Video
-            </label>
+    <textarea
+      id="caption"
+      placeholder="What's happening?"
+      maxlength="3000"
+    ></textarea>
 
-            <input
-              type="file"
-              id="mediaInput"
-              accept="image/*,video/*"
-              hidden
-            >
+    <div id="preview" class="media-preview"></div>
 
-            <button
-              type="button"
-              id="postBtn"
-            >
-              Publish
-            </button>
+    <div class="create-post-actions">
 
-          </div>
+      <label for="mediaInput" class="media-select">
+        📷 Add Photo / Video
+      </label>
 
-        </section>
+      <input
+        type="file"
+        id="mediaInput"
+        accept="image/*,video/*"
+        hidden
+      >
+
+      <button type="button" id="postBtn">
+        Publish
+      </button>
+
+    </div>
+
+  </section>
+
+</div>
+
 
 
         <!-- FEED -->
@@ -576,62 +585,57 @@
     </main>
 
 
-    <!-- ================= BOTTOM NAVIGATION ================= -->
+  
+<!-- ================= BOTTOM NAVIGATION ================= -->
 
-    <nav class="bottom-nav" aria-label="Main navigation">
+<nav class="bottom-nav" aria-label="Main navigation">
 
-      <button
-        type="button"
-        class="active"
-        data-page="home"
-      >
-        <span>⌂</span>
-        <small>Home</small>
-      </button>
+  <button
+    type="button"
+    class="active"
+    data-page="home"
+  >
+    <span>⌂</span>
+    <small>Home</small>
+  </button>
 
+  <button
+    type="button"
+    data-page="search"
+  >
+    <span>⌕</span>
+    <small>Discover</small>
+  </button>
 
-      <button
-        type="button"
-        data-page="search"
-      >
-        <span>⌕</span>
-        <small>Discover</small>
-      </button>
+  <button
+    type="button"
+    class="create-nav-btn"
+    data-action="create-post"
+    aria-label="Create post"
+  >
+    <span class="create-nav-icon">+</span>
+  </button>
 
+  <button
+    type="button"
+    data-page="notifications"
+  >
+    <span>♡</span>
+    <small>Activity</small>
+    <span id="notificationBadge" hidden>0</span>
+  </button>
 
-      <button
-        type="button"
-        data-page="requests"
-      >
-        <span>♧</span>
-        <small>Requests</small>
-      </button>
+  <button
+    type="button"
+    data-page="profile"
+  >
+    <span>◉</span>
+    <small>Profile</small>
+  </button>
 
+</nav>
 
-      <button
-        type="button"
-        data-page="notifications"
-      >
-        <span>♡</span>
-
-        <small>Activity</small>
-
-        <span id="notificationBadge" hidden>0</span>
-      </button>
-
-
-      <button
-        type="button"
-        data-page="profile"
-      >
-        <span>◉</span>
-        <small>Profile</small>
-      </button>
-
-    </nav>
-
-  </div>
-
+</div>
 
   <!-- ================= JAVASCRIPT ================= -->
 
