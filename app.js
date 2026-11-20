@@ -54,19 +54,21 @@ const $ = id => document.getElementById(id);
    2. GENERAL HELPERS
 ========================================================= */
 
+
 function escapeHTML(value = "") {
   return String(value).replace(/[&<>"']/g, char => ({
     "&": "&amp;",
     "<": "&lt;",
     ">": "&gt;",
     '"': "&quot;",
-    "'": "&#039;"
+    "'": "&#39;"
   })[char]);
 }
 
 function getInitial(name = "") {
   return escapeHTML(name.trim().charAt(0).toUpperCase() || "L");
 }
+
 
 function showToast(message, duration = 3000) {
   let toast = $("leakaToast");
@@ -105,6 +107,18 @@ function showToast(message, duration = 3000) {
   }, duration);
 }
 
+function showEmpty(container, icon, heading, description) {
+  if (!container) return;
+
+  container.innerHTML = `
+    <div class="empty-state">
+      <div>${escapeHTML(icon)}</div>
+      <h3>${escapeHTML(heading)}</h3>
+      <p>${escapeHTML(description)}</p>
+    </div>
+  `;
+}
+
 function formatTime(date) {
   if (!date) return "";
 
@@ -119,18 +133,6 @@ function formatTime(date) {
   if (seconds < 604800) return Math.floor(seconds / 86400) + "d";
 
   return time.toLocaleDateString();
-}
-
-function showEmpty(container, icon, heading, description) {
-  if (!container) return;
-
-  container.innerHTML = `
-    <div class="empty-state">
-      <div>${icon}</div>
-      <h3>${escapeHTML(heading)}</h3>
-      <p>${escapeHTML(description)}</p>
-    </div>
-  `;
 }
 
 function setButtonLoading(button, loading, originalText) {
@@ -167,7 +169,6 @@ async function getMyProfile() {
   currentProfile = data;
   return data;
 }
-
 
 /* =========================================================
    3. NAVIGATION
@@ -342,6 +343,7 @@ async function signOut() {
   showToast("Logged out successfully.");
 }
 
+
 function initializeAuthentication() {
   $("loginBtn")?.addEventListener("click", signIn);
   $("signupBtn")?.addEventListener("click", signUp);
@@ -358,8 +360,12 @@ function initializeAuthentication() {
       currentUser = null;
       currentProfile = null;
 
-      $("auth").hidden = false;
-      $("appContent").hidden = true;
+      if ($("auth")) $("auth").hidden = false;
+      if ($("appContent")) $("appContent").hidden = true;
+    }
+
+    if (event === "SIGNED_IN" || event === "TOKEN_REFRESHED") {
+      currentUser = session?.user || null;
     }
   });
 }
@@ -446,7 +452,7 @@ async function uploadFile(file, folder) {
   const extension = file.name.split(".").pop().toLowerCase();
 
   const path =
-    `${folder}/${currentUser.id}/${Date.now()}-${crypto.randomUUID()}.${extension}`;
+  `${folder}/${currentUser.id}/${Date.now()}-${crypto.randomUUID()}.${extension}`;
 
   const { error } = await db.storage
     .from(STORAGE_BUCKET)
@@ -574,6 +580,8 @@ async function createPost() {
    9. LOAD FEED
 ========================================================= */
 
+
+
 async function loadFeed() {
   const container = $("posts");
 
@@ -594,14 +602,12 @@ async function loadFeed() {
 
   if (error) {
     console.error("Feed:", error);
-
     showEmpty(
       container,
       "!",
       "Feed unavailable",
       "Could not load posts. Check your connection."
     );
-
     return;
   }
 
@@ -612,7 +618,6 @@ async function loadFeed() {
       "Nothing here yet",
       "Be the first to share something with LEAKA."
     );
-
     return;
   }
 
@@ -627,10 +632,7 @@ async function loadFeed() {
 
     if (!author) continue;
 
-    if (
-      author.is_private &&
-      author.id !== currentUser.id
-    ) {
+    if (author.is_private && author.id !== currentUser.id) {
       const { data: follow } = await db
         .from("follows")
         .select("follower_id")
@@ -641,16 +643,15 @@ async function loadFeed() {
       if (!follow) continue;
     }
 
-    visiblePosts.push({
-      ...post,
-      author
-    });
+    visiblePosts.push({ ...post, author });
   }
 
   const postIds = visiblePosts.map(post => post.id);
 
   let likes = [];
   let comments = [];
+  let commentProfiles = {};
+  let commentLikes = [];
 
   if (postIds.length) {
     const [likeResult, commentResult] = await Promise.all([
@@ -664,8 +665,49 @@ async function loadFeed() {
         .order("created_at", { ascending: true })
     ]);
 
-    if (!likeResult.error) likes = likeResult.data || [];
-    if (!commentResult.error) comments = commentResult.data || [];
+    if (!likeResult.error) {
+      likes = likeResult.data || [];
+    }
+
+    if (!commentResult.error) {
+      comments = commentResult.data || [];
+    }
+
+    const commentIds = comments.map(comment => comment.id);
+
+    if (commentIds.length) {
+      const { data, error } = await db
+        .from("comment_likes")
+        .select("comment_id, user_id")
+        .in("comment_id", commentIds);
+
+      if (error) {
+        console.error("COMMENT LIKES:", error);
+      } else {
+        commentLikes = data || [];
+      }
+    }
+
+    const commenterIds = [
+      ...new Set(
+        comments.map(comment => comment.user_id).filter(Boolean)
+      )
+    ];
+
+    if (commenterIds.length) {
+      const { data, error } = await db
+        .from("profiles")
+        .select("id, username, display_name")
+        .in("id", commenterIds);
+
+      if (error) {
+        console.error("COMMENT PROFILES:", error);
+      } else {
+        (data || []).forEach(profile => {
+          commentProfiles[profile.id] = profile;
+        });
+      }
+    }
   }
 
   container.innerHTML = "";
@@ -699,32 +741,152 @@ async function loadFeed() {
       ? `<p class="post-caption">${escapeHTML(post.caption)}</p>`
       : "";
 
-    const commentHTML = postComments.map(comment => {
+    const topLevelComments = postComments
+      .filter(comment => !comment.parent_comment_id)
+      .sort((a, b) => {
+        const aLikes = commentLikes.filter(
+          like => like.comment_id === a.id
+        ).length;
+
+        const bLikes = commentLikes.filter(
+          like => like.comment_id === b.id
+        ).length;
+
+        return bLikes - aLikes ||
+          new Date(a.created_at) - new Date(b.created_at);
+      });
+
+    // Render comments and nested replies.
+    // Every reply thread starts hidden.
+    const renderComment = (
+      comment,
+      depth = 0,
+      ancestors = new Set()
+    ) => {
+      if (ancestors.has(comment.id)) return "";
+
+      const nextAncestors = new Set(ancestors);
+      nextAncestors.add(comment.id);
+
+      const commenter = commentProfiles[comment.user_id];
+
+      const username =
+        commenter?.username ||
+        commenter?.display_name ||
+        "User";
+
+      const isCreator = comment.user_id === post.user_id;
+
+      const commentLikeList = commentLikes.filter(
+        like => like.comment_id === comment.id
+      );
+
+      const commentLiked = commentLikeList.some(
+        like => like.user_id === currentUser.id
+      );
+
+      const replies = postComments
+        .filter(reply => reply.parent_comment_id === comment.id)
+        .sort((a, b) =>
+          new Date(a.created_at) - new Date(b.created_at)
+        );
+
+      const replyHTML = replies
+        .map(reply =>
+          renderComment(reply, depth + 1, nextAncestors)
+        )
+        .join("");
+
+      const replyToggle = replies.length
+        ? `
+          <button
+            type="button"
+            class="view-replies-btn"
+            data-toggle-replies
+            data-reply-count="${replies.length}">
+            View replies (${replies.length})
+          </button>
+        `
+        : "";
+
       return `
-        <p>
-          <strong>${escapeHTML(comment.username || "User")}:</strong>
-          ${escapeHTML(comment.content || comment.comment || "")}
-        </p>
+        <div
+          class="leaka-comment ${depth > 0 ? "reply-comment" : ""}"
+          data-comment-id="${escapeHTML(comment.id)}"
+          style="margin-left:${Math.min(depth * 18, 90)}px">
+
+          <div class="leaka-comment-content">
+
+            <strong>${escapeHTML(username)}</strong>
+
+            ${isCreator
+              ? `<span class="creator-badge">CREATOR</span>`
+              : ""}
+
+            <p>${escapeHTML(comment.content || "")}</p>
+
+            <div class="comment-actions">
+
+              <button
+                type="button"
+                class="comment-like-btn ${commentLiked ? "liked" : ""}"
+                data-like-comment="${escapeHTML(comment.id)}">
+                ${commentLiked ? "♥" : "♡"}
+                <span>${commentLikeList.length}</span>
+              </button>
+
+              <button
+                type="button"
+                class="comment-reply-btn"
+                data-reply-comment="${escapeHTML(comment.id)}">
+                Reply
+              </button>
+
+              <small>${formatTime(comment.created_at)}</small>
+
+            </div>
+
+            ${replyToggle}
+
+            <div
+              class="comment-replies"
+              ${replies.length ? "hidden" : ""}>
+              ${replyHTML}
+            </div>
+
+          </div>
+        </div>
       `;
-    }).join("");
+    };
+
+    const commentHTML = topLevelComments
+      .map(comment => renderComment(comment))
+      .join("");
 
     const card = document.createElement("article");
 
     card.className = "post-card";
+    card.dataset.creatorId = post.user_id;
 
     card.innerHTML = `
       <div class="post-header">
 
-        <div class="post-avatar"
-             data-open-profile="${escapeHTML(author.id)}">
+        <div
+          class="post-avatar"
+          data-open-profile="${escapeHTML(author.id)}">
           ${avatar}
         </div>
 
         <div style="flex:1;min-width:0">
 
-          <div class="post-user"
-               data-open-profile="${escapeHTML(author.id)}">
-            ${escapeHTML(author.display_name || author.username || "LEAKA User")}
+          <div
+            class="post-user"
+            data-open-profile="${escapeHTML(author.id)}">
+            ${escapeHTML(
+              author.display_name ||
+              author.username ||
+              "LEAKA User"
+            )}
           </div>
 
           <div class="post-time">
@@ -747,21 +909,21 @@ async function loadFeed() {
 
         <button
           class="action-btn ${liked ? "liked" : ""}"
-          data-like-post="${escapeHTML(post.id)}"
-        >
+          data-like-post="${escapeHTML(post.id)}">
           ${liked ? "♥" : "♡"} ${postLikes.length}
         </button>
 
         <button
           class="action-btn"
-          data-focus-comment="${escapeHTML(post.id)}"
-        >
+          data-focus-comment="${escapeHTML(post.id)}">
           💬 ${postComments.length}
         </button>
 
       </div>
 
-      <div class="comments" id="comments-${escapeHTML(post.id)}">
+      <div
+        class="comments"
+        id="comments-${escapeHTML(post.id)}">
         ${commentHTML}
       </div>
 
@@ -771,13 +933,11 @@ async function loadFeed() {
           type="text"
           id="comment-input-${escapeHTML(post.id)}"
           placeholder="Write a comment..."
-          maxlength="1000"
-        >
+          maxlength="1000">
 
         <button
           type="button"
-          data-submit-comment="${escapeHTML(post.id)}"
-        >
+          data-submit-comment="${escapeHTML(post.id)}">
           Send
         </button>
 
@@ -871,95 +1031,300 @@ async function toggleLike(postId) {
 }
 
 
+async function toggleCommentLike(commentId) {
+  const buttons = [
+    ...document.querySelectorAll(
+      `[data-like-comment="${commentId}"]`
+    )
+  ];
+
+  if (!buttons.length) return;
+
+  buttons.forEach(button => button.disabled = true);
+
+  const originalStates = buttons.map(button => ({
+    liked: button.classList.contains("liked"),
+    count: Number(button.querySelector("span")?.textContent || 0)
+  }));
+
+  const wasLiked = originalStates[0].liked;
+
+  // Optimistic update
+  buttons.forEach(button => {
+    const count = Number(
+      button.querySelector("span")?.textContent || 0
+    );
+
+    button.classList.toggle("liked", !wasLiked);
+    button.innerHTML = `
+      ${wasLiked ? "♡" : "♥"}
+      <span>${Math.max(0, count + (wasLiked ? -1 : 1))}</span>
+    `;
+  });
+
+  const { data: existing, error: findError } = await db
+    .from("comment_likes")
+    .select("comment_id, user_id")
+    .eq("comment_id", commentId)
+    .eq("user_id", currentUser.id)
+    .maybeSingle();
+
+  if (findError) {
+    showToast("Could not check comment like.");
+
+    buttons.forEach((button, index) => {
+      button.classList.toggle("liked", originalStates[index].liked);
+      button.innerHTML = `
+        ${originalStates[index].liked ? "♥" : "♡"}
+        <span>${originalStates[index].count}</span>
+      `;
+      button.disabled = false;
+    });
+
+    return;
+  }
+
+  let error;
+
+  if (existing) {
+    ({ error } = await db
+      .from("comment_likes")
+      .delete()
+      .eq("comment_id", commentId)
+      .eq("user_id", currentUser.id));
+  } else {
+    ({ error } = await db
+      .from("comment_likes")
+      .insert({
+        comment_id: commentId,
+        user_id: currentUser.id
+      }));
+  }
+
+  if (error) {
+    showToast(error.message);
+
+    buttons.forEach((button, index) => {
+      button.classList.toggle("liked", originalStates[index].liked);
+      button.innerHTML = `
+        ${originalStates[index].liked ? "♥" : "♡"}
+        <span>${originalStates[index].count}</span>
+      `;
+    });
+  }
+
+  buttons.forEach(button => button.disabled = false);
+}
+
+
+
+async function submitCommentReply(commentId, button) {
+  const composer = button.closest(".reply-composer");
+  const input = composer?.querySelector("input");
+  const content = input?.value.trim();
+
+  if (!content || !currentUser) return;
+
+  button.disabled = true;
+
+  try {
+    // Find the comment being replied to
+    const { data: parent, error: parentError } = await db
+      .from("comments")
+      .select("id, post_id")
+      .eq("id", commentId)
+      .maybeSingle();
+
+    if (parentError || !parent) {
+      throw new Error("Original comment not found.");
+    }
+
+    // Save reply to Supabase
+    const { data: reply, error } = await db
+      .from("comments")
+      .insert({
+        post_id: parent.post_id,
+        user_id: currentUser.id,
+        content,
+        parent_comment_id: commentId
+      })
+      .select()
+      .single();
+
+    if (error) throw error;
+
+    // Get current username
+    const username =
+      currentProfile?.username ||
+      currentProfile?.display_name ||
+      "You";
+
+    // Check if current user owns the post
+    const postElement = document.querySelector(
+      `[data-comment-id="${commentId}"]`
+    )?.closest(".post-card");
+
+    const isCreator =
+      postElement?.dataset?.creatorId === currentUser.id;
+
+    // Create reply element safely
+    const replyElement = document.createElement("div");
+    replyElement.className = "leaka-comment reply-comment";
+    replyElement.dataset.commentId = reply.id;
+
+    const contentElement = document.createElement("div");
+    contentElement.className = "leaka-comment-content";
+
+    const name = document.createElement("strong");
+    name.textContent = username;
+    contentElement.appendChild(name);
+
+    if (isCreator) {
+      const badge = document.createElement("span");
+      badge.className = "creator-badge";
+      badge.textContent = "CREATOR";
+      contentElement.appendChild(badge);
+    }
+
+    const paragraph = document.createElement("p");
+    paragraph.textContent = reply.content;
+    contentElement.appendChild(paragraph);
+
+    const actions = document.createElement("div");
+    actions.className = "comment-actions";
+
+    const likeButton = document.createElement("button");
+    likeButton.type = "button";
+    likeButton.className = "comment-like-btn";
+    likeButton.dataset.likeComment = reply.id;
+    likeButton.innerHTML = '♡ <span>0</span>';
+
+    actions.appendChild(likeButton);
+    contentElement.appendChild(actions);
+
+    // Add reply button for nested replies
+    const replyButton = document.createElement("button");
+    replyButton.type = "button";
+    replyButton.className = "comment-reply-btn";
+    replyButton.dataset.replyComment = reply.id;
+    replyButton.textContent = "Reply";
+
+    actions.appendChild(replyButton);
+
+    // Add nested reply composer
+    const nestedComposer = document.createElement("div");
+    nestedComposer.className = "reply-composer";
+    nestedComposer.id = `reply-composer-${reply.id}`;
+    nestedComposer.hidden = true;
+
+    const nestedInput = document.createElement("input");
+    nestedInput.type = "text";
+    nestedInput.maxLength = 1000;
+    nestedInput.placeholder = "Write a reply...";
+    nestedInput.id = `reply-input-${reply.id}`;
+
+    const sendButton = document.createElement("button");
+    sendButton.type = "button";
+    sendButton.dataset.sendReply = reply.id;
+    sendButton.textContent = "Send";
+
+    nestedComposer.appendChild(nestedInput);
+    nestedComposer.appendChild(sendButton);
+
+    contentElement.appendChild(nestedComposer);
+
+    // Container for replies to this reply
+    const nestedReplies = document.createElement("div");
+    nestedReplies.className = "comment-replies";
+
+    contentElement.appendChild(nestedReplies);
+    replyElement.appendChild(contentElement);
+
+    // Insert into the correct parent comment
+    document.querySelectorAll(
+      `[data-comment-id="${commentId}"] > .leaka-comment-content > .comment-replies`
+    ).forEach(container => {
+      container.appendChild(replyElement.cloneNode(true));
+    });
+
+    input.value = "";
+    composer.hidden = true;
+
+    showToast("Reply added!");
+
+  } catch (error) {
+    console.error("REPLY ERROR:", error);
+    showToast("Could not send reply: " + error.message);
+  } finally {
+    button.disabled = false;
+  }
+}
+
+
 /* =========================================================
    11. COMMENTS
 ========================================================= */
 
+
+
+
 async function submitComment(postId) {
-  const input = $("activeCommentInput") ||
-    $("comment-input-" + postId);
+  const overlay = $("leakaCommentsOverlay");
+
+  const overlayIsOpen =
+    overlay &&
+    !overlay.hidden &&
+    overlay.dataset.postId === postId;
+
+  const input = overlayIsOpen
+    ? $("activeCommentInput")
+    : $("comment-input-" + postId);
 
   const content = input?.value.trim();
 
-  if (!content) return;
+  if (!content || !currentUser || !input) return;
 
-  const sendButton = $("activeCommentSend");
+  const sendButton = overlayIsOpen
+    ? $("activeCommentSend")
+    : document.querySelector(
+        `[data-submit-comment="${postId}"]`
+      );
+
+  const parentCommentId = input.dataset.replyTo || null;
 
   if (sendButton) sendButton.disabled = true;
 
-  const { data: comment, error } = await db
-    .from("comments")
-    .insert({
-      post_id: postId,
-      user_id: currentUser.id,
-      content
-    })
-    .select()
-    .single();
+  try {
+    const { error } = await db
+      .from("comments")
+      .insert({
+        post_id: postId,
+        user_id: currentUser.id,
+        content,
+        parent_comment_id: parentCommentId
+      });
 
-  if (error) {
-    console.error(error);
+    if (error) throw error;
+
+    input.value = "";
+    delete input.dataset.replyTo;
+    input.placeholder = "Write a comment...";
+
+    showToast(parentCommentId ? "Reply added!" : "Comment added!");
+
+    await loadFeed();
+
+    if (overlayIsOpen) {
+      openComments(postId);
+    }
+
+  } catch (error) {
+    console.error("COMMENT ERROR:", error);
     showToast("Could not send comment: " + error.message);
 
+  } finally {
     if (sendButton) sendButton.disabled = false;
-    return;
   }
-
-  const commentElement = document.createElement("p");
-
-  const username = document.createElement("strong");
-  username.textContent =
-    (currentProfile?.username || "You") + ": ";
-
-  commentElement.appendChild(username);
-  commentElement.appendChild(
-    document.createTextNode(comment.content)
-  );
-
-  const activeList = $("activeCommentsList");
-
-  if (activeList) {
-    activeList.appendChild(commentElement.cloneNode(true));
-    activeList.scrollTop = activeList.scrollHeight;
-  }
-
-  const originalList = $("comments-" + postId);
-
-  if (originalList) {
-    originalList.appendChild(commentElement);
-  }
-
-  const card = input.closest(".post-card") ||
-    document.querySelector(
-      `[data-like-post="${postId}"]`
-    )?.closest(".post-card");
-
-  const commentButton = card?.querySelector(
-    "[data-focus-comment]"
-  );
-
-  if (commentButton) {
-    const count = Number(
-      commentButton.textContent.match(/\d+/)?.[0] || 0
-    );
-
-    commentButton.textContent = "💬 " + (count + 1);
-  }
-
-  const heading = document.querySelector(
-    "#leakaCommentsOverlay .leaka-comments-header h3"
-  );
-
-  if (heading && commentButton) {
-    heading.textContent = "Comments (" +
-      commentButton.textContent.match(/\d+/)?.[0] + ")";
-  }
-
-  input.value = "";
-
-  if (sendButton) sendButton.disabled = false;
-
-  showToast("Comment added!");
 }
 
 /* =========================================================
@@ -2398,6 +2763,7 @@ async function sendStoryReply() {
 }
 
 
+
 function openComments(postId) {
   const card = document
     .querySelector(`[data-like-post="${postId}"]`)
@@ -2413,7 +2779,8 @@ function openComments(postId) {
     document.body.appendChild(overlay);
   }
 
-  // Pause the video if it is currently playing
+  overlay.dataset.postId = postId;
+
   const video = card.querySelector("video");
 
   commentVideoToResume =
@@ -2424,6 +2791,7 @@ function openComments(postId) {
   }
 
   const comments = card.querySelector(".comments");
+
   const commentButton = card.querySelector("[data-focus-comment]");
 
   const count = Number(
@@ -2443,7 +2811,11 @@ function openComments(postId) {
         >×</button>
       </div>
 
-      <div class="leaka-comments-list" id="activeCommentsList">
+      <div
+        class="leaka-comments-list"
+        id="activeCommentsList"
+        data-post-id="${escapeHTML(postId)}"
+      >
         ${comments?.innerHTML || ""}
       </div>
 
@@ -2469,15 +2841,23 @@ function openComments(postId) {
   overlay.hidden = false;
   document.body.style.overflow = "hidden";
 
-  $("closeLeakaComments").addEventListener(
-    "click",
-    closeComments
+  overlay.onclick = function(event) {
+
+  const closeButton = event.target.closest(
+    "#closeLeakaComments"
   );
 
- overlay.onclick = event => {
+  if (closeButton) {
+    event.preventDefault();
+    event.stopPropagation();
+    closeComments();
+    return;
+  }
+
   if (event.target === overlay) {
     closeComments();
   }
+
 };
 
   $("activeCommentSend").addEventListener("click", () => {
@@ -2486,6 +2866,7 @@ function openComments(postId) {
 
   $("activeCommentInput").addEventListener("keydown", event => {
     if (event.key === "Enter") {
+      event.preventDefault();
       submitComment(postId);
     }
   });
@@ -2493,24 +2874,13 @@ function openComments(postId) {
   $("activeCommentInput").focus();
 }
 
-function closeComments() {
-  const overlay = $("leakaCommentsOverlay");
-
-  if (overlay) {
-    overlay.hidden = true;
-  }
-
-  document.body.style.overflow = "";
-
-  if (commentVideoToResume) {
-    commentVideoToResume.play().catch(() => {});
-    commentVideoToResume = null;
-  }
-}
 
 /* =========================================================
    27. GLOBAL CLICK HANDLERS
 ========================================================= */
+
+
+
 
 function initializeGlobalEvents() {
 
@@ -2571,33 +2941,99 @@ function initializeGlobalEvents() {
       return;
     }
 
+    const commentLike = event.target.closest("[data-like-comment]");
+
+    if (commentLike) {
+      await toggleCommentLike(commentLike.dataset.likeComment);
+      return;
+    }
+
+    // SHOW OR HIDE REPLIES
+    const toggleReplies = event.target.closest("[data-toggle-replies]");
+
+    if (toggleReplies) {
+      const comment = toggleReplies.closest(".leaka-comment");
+      const replies = comment?.querySelector(
+        ":scope > .leaka-comment-content > .comment-replies"
+      );
+
+      if (replies) {
+        replies.hidden = !replies.hidden;
+
+        toggleReplies.textContent = replies.hidden
+          ? `View replies (${toggleReplies.dataset.replyCount})`
+          : "Hide replies";
+      }
+
+      return;
+    }
+
+    // USE THE MAIN COMMENT BOX TO REPLY
+    const replyButton = event.target.closest("[data-reply-comment]");
+
+    if (replyButton) {
+      const comment = replyButton.closest(".leaka-comment");
+      const postCard = replyButton.closest(".post-card");
+
+const postId =
+  postCard?.querySelector("[data-submit-comment]")?.dataset.submitComment ||
+  $("activeCommentsList")?.dataset.postId;
+
+if (!comment || !postId) return;
+
+      const input =
+        $("activeCommentInput") ||
+        (postId ? $("comment-input-" + postId) : null);
+
+      if (!input || !postId) {
+        showToast("Comment box unavailable. Open the comments first.");
+        return;
+      }
+
+      input.dataset.replyTo = comment.dataset.commentId;
+      input.placeholder = "Replying to a comment...";
+      input.focus();
+
+      return;
+    }
+
   });
 
   $("profilePosts")?.addEventListener("click", event => {
+
     const post = event.target.closest("[data-open-post]");
 
     if (!post) return;
 
     showToast("Open this post from your feed to interact with it.");
+
   });
 
   document.addEventListener("keydown", event => {
 
     if ($("storyViewer") && !$("storyViewer").hidden) {
+
       if (event.key === "Escape") closeStoryViewer();
+
       if (event.key === "ArrowRight") nextStory();
+
       if (event.key === "ArrowLeft") previousStory();
+
     }
 
-    if ($("leakaCommentsOverlay") &&
-        !$("leakaCommentsOverlay").hidden &&
-        event.key === "Escape") {
+    if (
+      $("leakaCommentsOverlay") &&
+      !$("leakaCommentsOverlay").hidden &&
+      event.key === "Escape"
+    ) {
       closeComments();
     }
 
   });
 
 }
+
+
 
 
 /* =========================================================
@@ -2628,4 +3064,20 @@ if (document.readyState === "loading") {
 } else {
   startLeaka();
 }
+
+function closeComments() {
+  const overlay = document.getElementById("leakaCommentsOverlay");
+
+  if (!overlay) return;
+
+  overlay.hidden = true;
+
+  document.body.style.overflow = "";
+
+  if (commentVideoToResume) {
+    commentVideoToResume.play().catch(() => {});
+    commentVideoToResume = null;
+  }
+}
+
 })();
