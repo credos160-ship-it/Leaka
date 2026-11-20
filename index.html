@@ -245,254 +245,325 @@
       </section>
 
 
-      <!-- ================= NOTIFICATIONS PAGE ================= -->
+  
+<!-- ================= ACTIVITY CENTRE ================= -->
 
-      <section class="page" id="notifications" hidden>
+<section class="page" id="notifications" hidden>
 
-        <div class="page-heading">
+  <div class="page-heading">
+    <h2>Activity</h2>
+    <p>Everything happening around you.</p>
+  </div>
 
-          <h2>Notifications</h2>
-          <p>Stay updated with your activity.</p>
+  <!-- ACTIVITY TABS -->
 
-        </div>
+  <div class="activity-tabs">
+
+    <button
+      type="button"
+      class="activity-tab active"
+      data-activity-tab="notifications"
+    >
+      Notifications
+    </button>
+
+    <button
+      type="button"
+      class="activity-tab"
+      data-activity-tab="follows"
+    >
+      Follows & Requests
+    </button>
+
+  </div>
+
+  <!-- NOTIFICATIONS PANEL -->
+
+  <div
+    class="activity-panel"
+    id="activityNotifications"
+  >
+
+    <button
+      type="button"
+      class="secondary"
+      id="markAllRead"
+    >
+      Mark all as read
+    </button>
+
+    <div id="notificationsList">
+
+      <div class="empty-state">
+        <div>♡</div>
+        <h3>Nothing here yet</h3>
+        <p>Your notifications will appear here.</p>
+      </div>
+
+    </div>
+
+  </div>
+
+ 
+<!-- FOLLOW REQUESTS PANEL -->
+
+<div
+  class="activity-panel"
+  id="activityFollows"
+  hidden
+>
+
+  <div class="follow-management-tabs">
+
+    <button
+      type="button"
+      class="follow-management-tab active"
+      data-follow-view="received"
+    >
+      Requests
+    </button>
+
+    <button
+      type="button"
+      class="follow-management-tab"
+      data-follow-view="sent"
+    >
+      Sent
+    </button>
+
+  </div>
+
+  <div id="followManagementContent">
+
+    <div
+      id="receivedRequestsList"
+      data-follow-list="received"
+    ></div>
+
+    <div
+      id="sentRequestsList"
+      data-follow-list="sent"
+      hidden
+    ></div>
+
+  </div>
+
+</div>
+
+</section>
+
+
+
+<!-- ================= PROFILE PAGE ================= -->
+
+<section class="page" id="profile" hidden>
+
+  <div class="page-heading">
+    <h2>My Profile</h2>
+    <p>Your personal space on LEAKA.</p>
+  </div>
+
+  <!-- COVER -->
+
+  <div class="profile-cover">
+
+    <img
+      id="profileCoverImage"
+      src=""
+      alt="Profile cover"
+      hidden
+    >
+
+    <div class="profile-cover-content">
+      LEAKA
+    </div>
+
+  </div>
+
+  <!-- PROFILE INFORMATION -->
+
+  <div class="profile-main">
+
+    <div class="profile-top">
+
+      <div class="profile-avatar" id="profileAvatar">
+        L
+      </div>
+
+      <button type="button" id="editProfileToggle">
+        Edit Profile
+      </button>
+
+    </div>
+
+    <h2 id="profileName">Your Name</h2>
+
+    <p id="profileEmail"></p>
+
+    <p id="profileBio">
+      Welcome to my LEAKA profile.
+    </p>
+
+    <!-- PROFILE STATISTICS -->
+
+    <div class="profile-stats">
+
+      <div class="profile-stat">
+        <strong id="postCount">0</strong>
+        <span>Posts</span>
+      </div>
+
+      <button
+        type="button"
+        class="profile-stat follow-stat"
+        id="openFollowersBtn"
+      >
+        <strong id="followerCount">0</strong>
+        <span>Followers</span>
+      </button>
+
+      <button
+        type="button"
+        class="profile-stat follow-stat"
+        id="openFollowingBtn"
+      >
+        <strong id="followingCount">0</strong>
+        <span>Following</span>
+      </button>
+
+    </div>
+
+    <!-- PROFILE EDITOR -->
+
+    <section id="profileEditSection" hidden>
+
+      <h3>Edit Your Profile</h3>
+
+      <div class="edit-avatar-section">
+
+        <label for="avatarInput">
+          Change Profile Picture
+        </label>
+
+        <input
+          type="file"
+          id="avatarInput"
+          accept="image/*"
+        >
+
+      </div>
+
+      <div class="edit-cover-section">
+
+        <label for="coverInput">
+          Change Cover Photo
+        </label>
+
+        <input
+          type="file"
+          id="coverInput"
+          accept="image/*"
+        >
+
+        <div id="editCoverPreview"></div>
+
+      </div>
+
+      <div class="profile-edit-fields">
+
+        <label for="displayName">
+          Display Name
+        </label>
+
+        <input
+          type="text"
+          id="displayName"
+          placeholder="Your display name"
+          maxlength="40"
+        >
+
+        <label for="bioInput">
+          Biography
+        </label>
+
+        <textarea
+          id="bioInput"
+          placeholder="Tell people about yourself..."
+          maxlength="250"
+        ></textarea>
+
+      </div>
+
+      <button type="button" id="saveProfileBtn">
+        Save Changes
+      </button>
+
+    </section>
+
+    <!-- PROFILE TABS -->
+
+    <div class="profile-tabs">
+
+      <button
+        type="button"
+        class="selected"
+        data-profile-tab="posts"
+      >
+        Posts
+      </button>
+
+      <button
+        type="button"
+        data-profile-tab="media"
+      >
+        Media
+      </button>
+
+    </div>
+
+    <!-- PROFILE POSTS -->
+
+    <div id="profilePosts">
+
+      <div class="empty-state">
+        <div>▦</div>
+        <h3>No posts yet</h3>
+        <p>Your published posts will appear here.</p>
+      </div>
+
+    </div>
+
+    <!-- FOLLOWERS & FOLLOWING VIEWER -->
+
+    <section id="profileFollowViewer" hidden>
+
+      <div class="profile-follow-header">
 
         <button
           type="button"
-          class="secondary"
-          id="markAllRead"
+          id="backToProfileBtn"
         >
-          Mark all as read
+          ← Back to Profile
         </button>
 
-        <div id="notificationsList">
+        <h3 id="profileFollowTitle">Followers</h3>
 
-          <div class="empty-state">
-            <div>♡</div>
-            <h3>Nothing here yet</h3>
-            <p>Your notifications will appear here.</p>
-          </div>
+      </div>
 
+      <div id="profileFollowList">
+
+        <div class="empty-state">
+          <div class="leaka-spinner"></div>
+          <h3>Loading...</h3>
         </div>
 
-      </section>
+      </div>
 
+    </section>
 
-      <!-- ================= FOLLOW REQUESTS ================= -->
+  </div>
 
-      <section class="page" id="requests" hidden>
-
-        <div class="page-heading">
-
-          <h2>Follow Requests</h2>
-          <p>Manage people who want to follow you.</p>
-
-        </div>
-
-        <div id="followRequestsList">
-
-          <div class="empty-state">
-            <div>♧</div>
-            <h3>No requests yet</h3>
-            <p>New follow requests will appear here.</p>
-          </div>
-
-        </div>
-
-      </section>
-
-
-      <!-- ================= PROFILE PAGE ================= -->
-
-      <section class="page" id="profile" hidden>
-
-        <div class="page-heading">
-          <h2>My Profile</h2>
-          <p>Your personal space on LEAKA.</p>
-        </div>
-
-
-        <!-- COVER -->
-
-        <div class="profile-cover">
-
-          <img
-            id="profileCoverImage"
-            src=""
-            alt="Profile cover"
-            hidden
-          >
-
-          <div class="profile-cover-content">
-            LEAKA
-          </div>
-
-        </div>
-
-
-        <!-- PROFILE INFORMATION -->
-
-        <div class="profile-main">
-
-          <div class="profile-top">
-
-            <div
-              class="profile-avatar"
-              id="profileAvatar"
-            >
-              L
-            </div>
-
-            <button
-              type="button"
-              id="editProfileToggle"
-            >
-              Edit Profile
-            </button>
-
-          </div>
-
-
-          <h2 id="profileName">Your Name</h2>
-
-          <p id="profileEmail"></p>
-
-          <p id="profileBio">
-            Welcome to my LEAKA profile.
-          </p>
-
-
-          <!-- PROFILE STATISTICS -->
-
-          <div class="profile-stats">
-
-            <div class="profile-stat">
-              <strong id="postCount">0</strong>
-              <span>Posts</span>
-            </div>
-
-            <div class="profile-stat">
-              <strong id="followerCount">0</strong>
-              <span>Followers</span>
-            </div>
-
-            <div class="profile-stat">
-              <strong id="followingCount">0</strong>
-              <span>Following</span>
-            </div>
-
-          </div>
-
-
-          <!-- PROFILE EDITOR -->
-
-          <section id="profileEditSection" hidden>
-
-            <h3>Edit Your Profile</h3>
-
-            <div class="edit-avatar-section">
-
-              <label for="avatarInput">
-                Change Profile Picture
-              </label>
-
-              <input
-                type="file"
-                id="avatarInput"
-                accept="image/*"
-              >
-
-            </div>
-
-
-            <div class="edit-cover-section">
-
-              <label for="coverInput">
-                Change Cover Photo
-              </label>
-
-              <input
-                type="file"
-                id="coverInput"
-                accept="image/*"
-              >
-
-              <div id="editCoverPreview"></div>
-
-            </div>
-
-
-            <div class="profile-edit-fields">
-
-              <label for="displayName">
-                Display Name
-              </label>
-
-              <input
-                type="text"
-                id="displayName"
-                placeholder="Your display name"
-                maxlength="40"
-              >
-
-              <label for="bioInput">
-                Biography
-              </label>
-
-              <textarea
-                id="bioInput"
-                placeholder="Tell people about yourself..."
-                maxlength="250"
-              ></textarea>
-
-            </div>
-
-            <button
-              type="button"
-              id="saveProfileBtn"
-            >
-              Save Changes
-            </button>
-
-          </section>
-
-
-          <!-- PROFILE TABS -->
-
-          <div class="profile-tabs">
-
-            <button
-              type="button"
-              class="selected"
-              data-profile-tab="posts"
-            >
-              Posts
-            </button>
-
-            <button
-              type="button"
-              data-profile-tab="media"
-            >
-              Media
-            </button>
-
-          </div>
-
-
-          <!-- PROFILE POSTS -->
-
-          <div id="profilePosts">
-
-            <div class="empty-state">
-              <div>▦</div>
-              <h3>No posts yet</h3>
-              <p>Your published posts will appear here.</p>
-            </div>
-
-          </div>
-
-        </div>
-
-      </section>
+</section>
 
 
       <!-- ================= SETTINGS PAGE ================= -->
