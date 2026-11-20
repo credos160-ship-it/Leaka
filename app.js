@@ -232,12 +232,33 @@ function navigateTo(page) {
   }
 }
 
+
+
 function initializeNavigation() {
   document.querySelectorAll("[data-page]").forEach(button => {
     button.addEventListener("click", () => {
       navigateTo(button.dataset.page);
     });
   });
+
+  // OPEN CREATE POST MODAL
+  document.querySelector('[data-action="create-post"]')
+    ?.addEventListener("click", () => {
+      const modal = $("createPostModal");
+
+      if (!modal) return;
+
+      modal.hidden = false;
+      document.body.classList.add("create-modal-open");
+
+      $("caption")?.focus();
+    });
+
+  // CLOSE CREATE POST MODAL
+  document.querySelectorAll("[data-close-create-post]")
+    .forEach(button => {
+      button.addEventListener("click", closeCreatePostModal);
+    });
 
   $("profileBtn")?.addEventListener("click", () => {
     navigateTo("profile");
@@ -246,6 +267,15 @@ function initializeNavigation() {
   $("settingsGear")?.addEventListener("click", () => {
     navigateTo("settings");
   });
+}
+
+function closeCreatePostModal() {
+  const modal = $("createPostModal");
+
+  if (!modal) return;
+
+  modal.hidden = true;
+  document.body.classList.remove("create-modal-open");
 }
 
 
@@ -390,8 +420,10 @@ async function initializeApp() {
     return;
   }
 
-  await loadMyProfilePage();
-  await loadFeed();
+ await loadFeed();
+await loadMyProfilePage();
+
+closeCreatePostModal();
   await loadStories();
   await loadNotifications();
   await loadFollowRequests();
@@ -821,20 +853,21 @@ const replyingTo = parentProfile
         `
         : "";
 
-        return `
-        <div
-          class="leaka-comment ${depth > 0 ? "reply-comment" : ""}"
-          data-comment-id="${escapeHTML(comment.id)}">
+      return `
+      
+<div
+  class="leaka-comment ${depth > 0 ? "reply-comment" : ""}"
+  data-comment-id="${escapeHTML(comment.id)}"
+>
+  <div class="leaka-comment-content">
 
-          <div class="leaka-comment-content">
+    <strong>${escapeHTML(username)}</strong>
 
-            <strong>${escapeHTML(username)}</strong>
-
-            ${replyingTo
-              ? `<small class="replying-to">
-                   Replying to @${escapeHTML(replyingTo)}
-                 </small>`
-              : ""}
+    ${replyingTo
+      ? `<small class="replying-to">
+           Replying to @${escapeHTML(replyingTo)}
+         </small>`
+      : ""}
 
             ${isCreator
               ? `<span class="creator-badge">CREATOR</span>`
