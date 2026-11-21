@@ -2408,10 +2408,19 @@ async function toggleFollow(user) {
    20. FOLLOW REQUESTS
 ========================================================= */
 
+
 async function loadFollowRequests() {
-  const container = $("followRequestsList");
+  const container =
+    $("receivedRequestsList") || $("followRequestsList");
 
   if (!container || !currentUser) return;
+
+  container.innerHTML = `
+    <div class="loading-state">
+      <div class="leaka-spinner"></div>
+      <p>Loading requests...</p>
+    </div>
+  `;
 
   const { data: requests, error } = await db
     .from("follow_requests")
@@ -2425,21 +2434,17 @@ async function loadFollowRequests() {
     return;
   }
 
-  const target = $("receivedRequestsList");
+  container.innerHTML = "";
 
   if (!requests?.length) {
     showEmpty(
-      target || container,
+      container,
       "♧",
       "No requests yet",
       "New follow requests will appear here."
     );
     return;
   }
-
-  container.innerHTML = "";
-
-  if (target) target.innerHTML = "";
 
   for (const request of requests) {
     const { data: user } = await db
@@ -2476,14 +2481,15 @@ async function loadFollowRequests() {
     `;
 
     container.appendChild(item);
-
-    if (target) {
-      target.appendChild(item.cloneNode(true));
-    }
   }
 
-  if (target && !target.children.length) {
-    showEmpty(target, "♧", "No requests yet", "New requests will appear here.");
+  if (!container.children.length) {
+    showEmpty(
+      container,
+      "♧",
+      "No requests yet",
+      "New follow requests will appear here."
+    );
   }
 }
 
