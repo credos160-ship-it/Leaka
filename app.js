@@ -35,6 +35,8 @@ const db = supabase;
 let currentUser = null;
 let currentProfile = null;
 let selectedMessageUser = null;
+let privateChatChannel = null;
+let displayedMessageIds = new Set();
 
 let currentPage = "home";
 let currentStoryGroup = [];
@@ -254,6 +256,120 @@ function navigateTo(page, addHistory = true) {
 /* ================= LEAKA PRIVATE CHAT ================= */
 
 
+function subscribeToPrivateChat(otherId) {
+  if (!currentUser) return;
+
+  // Remove previous conversation subscription
+  if (privateChatChannel) {
+    db.removeChannel(privateChatChannel);
+    privateChatChannel = null;
+  }
+
+  const channel = db.channel(
+    `private-chat-${currentUser.id}-${otherId}`
+  );
+
+  function handleNewMessage(payload) {
+    const message = payload.new;
+
+    if (!message || !message.id) return;
+
+    if (displayedMessageIds.has(message.id)) return;
+    
+    // Match our temporary message with the confirmed database message
+if (message.sender_id === currentUser.id) {
+  const container = $("chatMessages");
+
+  const pendingBubbles = container?.querySelectorAll(
+    ".chat-message.pending"
+  );
+
+  const pendingBubble = Array.from(pendingBubbles || [])
+    .find(bubble =>
+      bubble.dataset.pendingContent === message.content
+    );
+
+  if (pendingBubble) {
+    pendingBubble.classList.remove("pending");
+    delete pendingBubble.dataset.pendingContent;
+
+    pendingBubble.dataset.messageId = message.id;
+    displayedMessageIds.add(message.id);
+
+    return;
+  }
+}
+
+    if (
+      !(
+        (message.sender_id === currentUser.id &&
+         message.receiver_id === otherId) ||
+        (message.sender_id === otherId &&
+         message.receiver_id === currentUser.id)
+      )
+    ) return;
+
+    const container = $("chatMessages");
+    if (!container) return;
+
+    displayedMessageIds.add(message.id);
+
+    const empty = container.querySelector(".empty-state");
+    empty?.remove();
+
+    const bubble = document.createElement("div");
+
+    bubble.className =
+      "chat-message " +
+      (message.sender_id === currentUser.id ? "sent" : "received");
+
+    bubble.textContent = message.content;
+    bubble.dataset.messageId = message.id;
+
+    container.appendChild(bubble);
+    container.scrollTop = container.scrollHeight;
+
+    // Mark incoming messages as read
+    if (message.sender_id === otherId) {
+      db.from("messages")
+        .update({ is_read: true })
+        .eq("id", message.id)
+        .eq("receiver_id", currentUser.id)
+        .then(({ error }) => {
+          if (error) {
+            console.error("MARK READ ERROR:", error);
+          }
+        });
+    }
+  }
+
+  privateChatChannel = channel
+    .on(
+      "postgres_changes",
+      {
+        event: "INSERT",
+        schema: "public",
+        table: "messages",
+        filter: `receiver_id=eq.${currentUser.id}`
+      },
+      handleNewMessage
+    )
+    .on(
+      "postgres_changes",
+      {
+        event: "INSERT",
+        schema: "public",
+        table: "messages",
+        filter: `sender_id=eq.${currentUser.id}`
+      },
+      handleNewMessage
+    )
+    .subscribe(status => {
+      console.log("PRIVATE CHAT REALTIME:", status);
+    });
+}
+
+
 async function openPrivateChat(user) {
   if (!user || !currentUser) return;
 
@@ -279,6 +395,8 @@ async function openPrivateChat(user) {
     user.username ? "@" + user.username : "";
 
   $("chatUserAvatar").innerHTML = getAvatar(user);
+  
+  subscribeToPrivateChat(user.id);
 
   await loadPrivateChatMessages();
 }
@@ -308,6 +426,7 @@ async function loadPrivateChatMessages() {
 
     // Only render after successfully fetching
     container.innerHTML = "";
+    displayedMessageIds.clear();
 
     if (!data?.length) {
       container.innerHTML =
@@ -321,6 +440,8 @@ async function loadPrivateChatMessages() {
           (message.sender_id === currentUser.id ? "sent" : "received");
 
         bubble.textContent = message.content;
+        bubble.dataset.messageId = message.id;
+displayedMessageIds.add(message.id);
 
         container.appendChild(bubble);
       });
@@ -345,7 +466,8 @@ async function loadPrivateChatMessages() {
 }
 
 
-// SEND MESSAGE — INSTANT LOCAL UPDATE
+
+// SEND MESSAGE — OPTIMISTIC INSTANT DISPLAY
 async function sendPrivateMessage(event) {
   event.preventDefault();
 
@@ -353,6 +475,7 @@ async function sendPrivateMessage(event) {
 
   const input = $("chatMessageInput");
   const button = $("sendChatMessageBtn");
+  const container = $("chatMessages");
 
   const content = input.value.trim();
 
@@ -361,9 +484,17 @@ async function sendPrivateMessage(event) {
   const receiverId = selectedMessageUser.id;
 
   button.disabled = true;
-
-  // Preserve the message immediately
   input.value = "";
+
+  // Create message immediately
+  const optimisticBubble = document.createElement("div");
+
+  optimisticBubble.className = "chat-message sent pending";
+  optimisticBubble.textContent = content;
+  optimisticBubble.dataset.pendingContent = content;
+
+  container.appendChild(optimisticBubble);
+  container.scrollTop = container.scrollHeight;
 
   try {
     const { data, error } = await db.rpc(
@@ -376,10 +507,9 @@ async function sendPrivateMessage(event) {
 
     if (error) throw error;
 
-    // Do not reload the conversation.
-    // Realtime will handle incoming messages.
-    
+    // Message requests should not remain as chat bubbles
     if (data?.is_request) {
+      optimisticBubble.remove();
       showToast("Message request sent!");
     } else {
       showToast("Message sent!");
@@ -388,7 +518,9 @@ async function sendPrivateMessage(event) {
   } catch (error) {
     console.error("SEND MESSAGE ERROR:", error);
 
-    // Restore message if sending fails
+    // Remove failed optimistic message
+    optimisticBubble.remove();
+
     input.value = content;
 
     showToast(error.message || "Could not send message.");
@@ -398,6 +530,7 @@ async function sendPrivateMessage(event) {
     input.focus();
   }
 }
+
 
 
 // BACK TO INBOX
