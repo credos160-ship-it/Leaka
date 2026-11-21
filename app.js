@@ -34,6 +34,7 @@ const db = supabase;
 
 let currentUser = null;
 let currentProfile = null;
+let selectedMessageUser = null;
 
 let currentPage = "home";
 let currentStoryGroup = [];
@@ -182,10 +183,13 @@ async function getMyProfile() {
 ========================================================= */
 
 
+
+
 function navigateTo(page, addHistory = true) {
   const allowedPages = [
     "home",
     "search",
+    "messages",
     "profile",
     "notifications",
     "requests",
@@ -199,22 +203,30 @@ function navigateTo(page, addHistory = true) {
     return;
   }
 
+  // Restore bottom navigation when leaving private chat
+  if (page !== "messages" || !selectedMessageUser) {
+    document.body.classList.remove("private-chat-open");
+
+    const privateChat = $("privateChatView");
+    const messagesContent = $("messagesContent");
+
+    if (privateChat) privateChat.hidden = true;
+    if (messagesContent) messagesContent.hidden = false;
+
+    if (page !== "messages") {
+      selectedMessageUser = null;
+    }
+  }
+
   if (addHistory && currentPage !== page) {
-    history.pushState(
-      { page },
-      "",
-      "#" + page
-    );
+    history.pushState({ page }, "", "#" + page);
   }
 
   currentPage = page;
 
   allowedPages.forEach(name => {
     const section = $(name);
-
-    if (section) {
-      section.hidden = name !== page;
-    }
+    if (section) section.hidden = name !== page;
   });
 
   document.querySelectorAll(".bottom-nav button").forEach(button => {
@@ -231,23 +243,184 @@ function navigateTo(page, addHistory = true) {
     loadStories();
   }
 
-  if (page === "profile") {
-    loadMyProfilePage();
-  }
+  if (page === "messages") loadMessages();
+  if (page === "profile") loadMyProfilePage();
+  if (page === "notifications") loadNotifications();
+  if (page === "requests") loadFollowRequests();
+  if (page === "settings") loadSettings();
+}
 
-  if (page === "notifications") {
-    loadNotifications();
-  }
 
-  if (page === "requests") {
-    loadFollowRequests();
-  }
+/* ================= LEAKA PRIVATE CHAT ================= */
 
-  if (page === "settings") {
-    loadSettings();
+
+async function openPrivateChat(user) {
+  if (!user || !currentUser) return;
+
+  selectedMessageUser = user;
+
+  navigateTo("messages", false);
+
+  const view = $("privateChatView");
+  const content = $("messagesContent");
+
+  if (!view || !content) return;
+
+  content.hidden = true;
+  view.hidden = false;
+
+  // Hide bottom navigation
+  document.body.classList.add("private-chat-open");
+
+  $("chatUserName").textContent =
+    user.display_name || user.username || "User";
+
+  $("chatUserHandle").textContent =
+    user.username ? "@" + user.username : "";
+
+  $("chatUserAvatar").innerHTML = getAvatar(user);
+
+  await loadPrivateChatMessages();
+}
+
+
+
+
+async function loadPrivateChatMessages() {
+  if (!selectedMessageUser || !currentUser) return;
+
+  const container = $("chatMessages");
+  if (!container) return;
+
+  const otherId = selectedMessageUser.id;
+
+  try {
+    // Load conversation without clearing existing messages
+    const { data, error } = await db
+      .from("messages")
+      .select("*")
+      .or(
+        `and(sender_id.eq.${currentUser.id},receiver_id.eq.${otherId}),and(sender_id.eq.${otherId},receiver_id.eq.${currentUser.id})`
+      )
+      .order("created_at", { ascending: true });
+
+    if (error) throw error;
+
+    // Only render after successfully fetching
+    container.innerHTML = "";
+
+    if (!data?.length) {
+      container.innerHTML =
+        '<div class="empty-state"><p>Start your conversation!</p></div>';
+    } else {
+      data.forEach(message => {
+        const bubble = document.createElement("div");
+
+        bubble.className =
+          "chat-message " +
+          (message.sender_id === currentUser.id ? "sent" : "received");
+
+        bubble.textContent = message.content;
+
+        container.appendChild(bubble);
+      });
+    }
+
+    container.scrollTop = container.scrollHeight;
+
+    // Mark incoming messages as read
+    const { error: readError } = await db
+      .from("messages")
+      .update({ is_read: true })
+      .eq("sender_id", otherId)
+      .eq("receiver_id", currentUser.id)
+      .eq("is_read", false);
+
+    if (readError) throw readError;
+
+  } catch (error) {
+    console.error("CHAT LOAD ERROR:", error);
+    showToast(error.message || "Unable to load messages.");
   }
 }
 
+
+// SEND MESSAGE — INSTANT LOCAL UPDATE
+async function sendPrivateMessage(event) {
+  event.preventDefault();
+
+  if (!selectedMessageUser || !currentUser) return;
+
+  const input = $("chatMessageInput");
+  const button = $("sendChatMessageBtn");
+
+  const content = input.value.trim();
+
+  if (!content) return;
+
+  const receiverId = selectedMessageUser.id;
+
+  button.disabled = true;
+
+  // Preserve the message immediately
+  input.value = "";
+
+  try {
+    const { data, error } = await db.rpc(
+      "send_leaka_message",
+      {
+        p_receiver_id: receiverId,
+        p_content: content
+      }
+    );
+
+    if (error) throw error;
+
+    // Do not reload the conversation.
+    // Realtime will handle incoming messages.
+    
+    if (data?.is_request) {
+      showToast("Message request sent!");
+    } else {
+      showToast("Message sent!");
+    }
+
+  } catch (error) {
+    console.error("SEND MESSAGE ERROR:", error);
+
+    // Restore message if sending fails
+    input.value = content;
+
+    showToast(error.message || "Could not send message.");
+
+  } finally {
+    button.disabled = false;
+    input.focus();
+  }
+}
+
+
+// BACK TO INBOX
+$("backToMessagesBtn")?.addEventListener("click", () => {
+  $("privateChatView").hidden = true;
+  $("messagesContent").hidden = false;
+
+  // Restore bottom navigation
+  document.body.classList.remove("private-chat-open");
+
+  selectedMessageUser = null;
+
+  loadMessages();
+});
+
+// MESSAGE FORM
+$("chatMessageForm")?.addEventListener(
+  "submit",
+  sendPrivateMessage
+);
+
+
+// END PRIVATE CHAT
 
 
 function initializeNavigation() {
@@ -283,6 +456,36 @@ function initializeNavigation() {
   $("settingsGear")?.addEventListener("click", () => {
     navigateTo("settings");
   });
+  
+    // OPEN SEARCH FROM HOME
+  $("homeSearchBtn")?.addEventListener("click", () => {
+    navigateTo("search");
+  });
+  
+  
+  // MESSAGES TAB SWITCHING
+  document.querySelectorAll("[data-message-tab]").forEach(button => {
+    button.addEventListener("click", () => {
+      const tab = button.dataset.messageTab;
+
+      const tabs = {
+        chats: $("chatsTab"),
+        requests: $("messageRequestsTab"),
+        sent: $("sentMessagesTab")
+      };
+
+      Object.entries(tabs).forEach(([name, section]) => {
+        if (section) {
+          section.hidden = name !== tab;
+        }
+      });
+
+      document.querySelectorAll("[data-message-tab]").forEach(btn => {
+        btn.classList.toggle("active", btn === button);
+      });
+    });
+  });
+
 }
 
 function closeCreatePostModal() {
@@ -2314,9 +2517,16 @@ if (
     await openPublicProfile(userId);
   });
 
-  $("publicMessageBtn")?.addEventListener("click", () => {
-    showToast("Messaging needs a configured conversations and messages system.");
-  });
+  
+$("publicMessageBtn")?.addEventListener("click", () => {
+  selectedMessageUser = user;
+
+  overlay.hidden = true;
+overlay.dataset.historyOpen = "";
+
+openPrivateChat(user);
+});
+
 }
 
 
@@ -3719,6 +3929,394 @@ window.addEventListener("popstate", event => {
 
   navigateTo(page, false);
 });
+
+
+/* ================= MESSAGE HELPERS ================= */
+
+async function getMessageProfiles(ids) {
+  const uniqueIds = [...new Set(ids)].filter(Boolean);
+
+  if (!uniqueIds.length) return {};
+
+  const { data, error } = await db
+    .from("profiles")
+    .select("*")
+    .in("id", uniqueIds);
+
+  if (error) throw error;
+
+  return Object.fromEntries(
+    (data || []).map(user => [user.id, user])
+  );
+}
+
+
+
+function renderMessageUser(user, preview, action = "", message = null, unreadCount = 0) {
+  const item = document.createElement("button");
+
+  item.type = "button";
+  item.className = "request-list-item message-user-card";
+
+  if (action === "chat") {
+    item.dataset.openChat = user.id;
+  }
+
+  const time = message?.created_at
+    ? new Date(message.created_at).toLocaleTimeString([], {
+        hour: "2-digit",
+        minute: "2-digit"
+      })
+    : "";
+
+  item.innerHTML = `
+    <div class="request-avatar">
+      ${getAvatar(user)}
+    </div>
+
+    <div class="request-info">
+      <strong>${escapeHTML(user.display_name || user.username || "User")}</strong>
+      <small>${escapeHTML(preview || "Start a conversation")}</small>
+    </div>
+
+    <div class="message-chat-meta">
+      <small>${time}</small>
+
+      ${unreadCount > 0 ? `
+        <span class="unread-chat-badge">
+          ${unreadCount}
+        </span>
+      ` : ""}
+    </div>
+  `;
+
+  return item;
+}
+
+
+function renderMessageRequest(request, user, type) {
+  const item = document.createElement("div");
+
+  item.className = "request-list-item message-request-card";
+
+  item.innerHTML = `
+    <div class="request-avatar">
+      ${getAvatar(user)}
+    </div>
+
+    <div class="request-info">
+      <strong>${escapeHTML(user.display_name || user.username || "User")}</strong>
+      <small>@${escapeHTML(user.username || "")}</small>
+      <small>${type === "incoming" ? "Wants to message you" : "Waiting for approval"}</small>
+    </div>
+
+    ${
+      type === "incoming"
+        ? `
+          <button type="button"
+            data-accept-message-request="${escapeHTML(request.id)}">
+            Accept
+          </button>
+
+          <button type="button"
+            class="danger"
+            data-decline-message-request="${escapeHTML(request.id)}">
+            Decline
+          </button>
+        `
+        : `<small>Pending</small>`
+    }
+  `;
+
+  return item;
+}
+
+
+
+/* ================= LOAD LEAKA MESSAGES ================= */
+
+async function loadMessages() {
+  const chats = $("conversationsList");
+  const incoming = $("incomingMessageRequests");
+  const sent = $("sentMessageRequests");
+
+  if (!chats || !incoming || !sent || !currentUser) return;
+
+  chats.innerHTML = "<p>Loading conversations...</p>";
+  incoming.innerHTML = "<p>Loading requests...</p>";
+  sent.innerHTML = "<p>Loading sent requests...</p>";
+
+  try {
+    const [messagesResult, requestsResult, followsResult] =
+      await Promise.all([
+        db.from("messages")
+          .select("*")
+          .or(`sender_id.eq.${currentUser.id},receiver_id.eq.${currentUser.id}`)
+          .order("created_at", { ascending: false }),
+
+        db.from("message_requests")
+          .select("*")
+          .or(`sender_id.eq.${currentUser.id},receiver_id.eq.${currentUser.id}`)
+          .order("created_at", { ascending: false }),
+
+        db.from("follows")
+          .select("follower_id,following_id")
+          .or(`follower_id.eq.${currentUser.id},following_id.eq.${currentUser.id}`)
+      ]);
+
+    if (messagesResult.error) throw messagesResult.error;
+    if (requestsResult.error) throw requestsResult.error;
+    if (followsResult.error) throw followsResult.error;
+
+    const messages = messagesResult.data || [];
+    const requests = requestsResult.data || [];
+    const follows = followsResult.data || [];
+
+    const pendingIncoming = requests.filter(r =>
+      r.receiver_id === currentUser.id && r.status === "pending"
+    );
+
+    const pendingSent = requests.filter(r =>
+      r.sender_id === currentUser.id && r.status === "pending"
+    );
+
+    const acceptedRequests = requests.filter(r =>
+      r.status === "accepted"
+    );
+
+    const incomingIds = pendingIncoming.map(r => r.sender_id);
+    const sentIds = pendingSent.map(r => r.receiver_id);
+
+    const otherIds = [
+      ...new Set(messages.map(m =>
+        m.sender_id === currentUser.id
+          ? m.receiver_id
+          : m.sender_id
+      ))
+    ];
+
+    const profiles = await getMessageProfiles([
+      ...incomingIds,
+      ...sentIds,
+      ...otherIds
+    ]);
+
+    // Build mutual-follow pairs
+    const following = new Set(
+      follows
+        .filter(f => f.follower_id === currentUser.id)
+        .map(f => f.following_id)
+    );
+
+    const followers = new Set(
+      follows
+        .filter(f => f.following_id === currentUser.id)
+        .map(f => f.follower_id)
+    );
+
+    const acceptedIds = new Set(
+      acceptedRequests.map(r =>
+        r.sender_id === currentUser.id
+          ? r.receiver_id
+          : r.sender_id
+      )
+    );
+
+    // Incoming requests
+    incoming.innerHTML = "";
+
+    if (!pendingIncoming.length) {
+      showEmpty(incoming, "♧", "No requests yet",
+        "New message requests will appear here.");
+    } else {
+      for (const request of pendingIncoming) {
+        const user = profiles[request.sender_id];
+        if (user) {
+          incoming.appendChild(
+            renderMessageRequest(request, user, "incoming")
+          );
+        }
+      }
+    }
+
+    // Sent requests
+    sent.innerHTML = "";
+
+    if (!pendingSent.length) {
+      showEmpty(sent, "♧", "No sent requests",
+        "Message requests you send will appear here.");
+    } else {
+      for (const request of pendingSent) {
+        const user = profiles[request.receiver_id];
+        if (user) {
+          sent.appendChild(
+            renderMessageRequest(request, user, "sent")
+          );
+        }
+      }
+    }
+
+    // Build one conversation per person
+    const latestByUser = new Map();
+
+    for (const message of messages) {
+      const otherId = message.sender_id === currentUser.id
+        ? message.receiver_id
+        : message.sender_id;
+
+      if (!latestByUser.has(otherId)) {
+        latestByUser.set(otherId, message);
+      }
+    }
+
+    const activeChats = [];
+
+    for (const [otherId, latestMessage] of latestByUser) {
+      const mutual =
+        following.has(otherId) && followers.has(otherId);
+
+      const accepted = acceptedIds.has(otherId);
+      
+// Do not show unaccepted message requests as chats.
+if (mutual || accepted) {
+
+  const unreadCount = messages.filter(message =>
+    message.sender_id === otherId &&
+    message.receiver_id === currentUser.id &&
+    !message.is_read
+  ).length;
+
+  activeChats.push({
+    user: profiles[otherId],
+    message: latestMessage,
+    unreadCount
+  });
+}
+    }
+
+    activeChats.sort((a, b) =>
+      new Date(b.message.created_at) -
+      new Date(a.message.created_at)
+    );
+
+    chats.innerHTML = "";
+
+    if (!activeChats.length) {
+      showEmpty(chats, "✉", "No conversations yet",
+        "Find someone to message and start a conversation.");
+    } else {
+      for (const chat of activeChats) {
+        if (!chat.user) continue;
+
+        const preview = chat.message.content || "Sent a message";
+
+        chats.appendChild(
+  renderMessageUser(
+    chat.user,
+    preview,
+    "chat",
+    chat.message,
+    chat.unreadCount
+  )
+);
+      }
+    }
+
+    // Count unread messages in active chats, plus incoming requests.
+    const pendingIncomingSet = new Set(incomingIds);
+
+    const unreadActiveMessages = messages.filter(message => {
+      if (message.receiver_id !== currentUser.id || message.is_read) {
+        return false;
+      }
+
+      return !pendingIncomingSet.has(message.sender_id);
+    }).length;
+
+    const totalMessageNotifications =
+      pendingIncoming.length + unreadActiveMessages;
+
+    const badge = $("messageBadge");
+
+    if (badge) {
+      badge.textContent = totalMessageNotifications > 99
+        ? "99+"
+        : totalMessageNotifications;
+
+      badge.hidden = totalMessageNotifications === 0;
+    }
+
+    // Wire actions once
+    if (!incoming.dataset.actionsBound) {
+      incoming.dataset.actionsBound = "true";
+
+      incoming.addEventListener("click", async event => {
+        const accept = event.target.closest(
+          "[data-accept-message-request]"
+        );
+
+        const decline = event.target.closest(
+          "[data-decline-message-request]"
+        );
+
+        const button = accept || decline;
+        if (!button) return;
+
+        const requestId = button.dataset.acceptMessageRequest ||
+          button.dataset.declineMessageRequest;
+
+        button.disabled = true;
+
+        try {
+          const { error } = await db
+            .from("message_requests")
+            .update({
+              status: accept ? "accepted" : "declined"
+            })
+            .eq("id", requestId)
+            .eq("receiver_id", currentUser.id)
+            .eq("status", "pending");
+
+          if (error) throw error;
+
+          showToast(
+            accept ? "Message request accepted!" : "Request declined."
+          );
+
+          await loadMessages();
+
+        } catch (error) {
+          console.error("MESSAGE REQUEST ERROR:", error);
+          showToast(error.message || "Could not update request.");
+          button.disabled = false;
+        }
+      });
+    }
+
+    if (!chats.dataset.actionsBound) {
+      chats.dataset.actionsBound = "true";
+
+      chats.addEventListener("click", event => {
+        const button = event.target.closest("[data-open-chat]");
+        if (!button) return;
+
+        const user = profiles[button.dataset.openChat];
+
+        if (user) openPrivateChat(user);
+      });
+    }
+
+  } catch (error) {
+    console.error("LEAKA messages error:", error);
+
+    chats.innerHTML = "<p>Couldn't load conversations.</p>";
+    incoming.innerHTML = "";
+    sent.innerHTML = "";
+
+    showToast(error.message || "Couldn't load messages.");
+  }
+}
+
 
 
 })();
