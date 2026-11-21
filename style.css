@@ -1535,9 +1535,9 @@ video.post-media {
 }
 
 .request-avatar {
-  flex: 0 0 40px;
-  width: 40px;
-  height: 40px;
+  flex: 0 0 48px;
+  width: 48px;
+  height: 48px;
   display: grid;
   place-items: center;
   border-radius: 50%;
@@ -1550,30 +1550,36 @@ video.post-media {
   height: 100%;
   object-fit: cover;
 }
-
 .request-info {
   flex: 1;
-  min-width: 80px;
+  min-width: 0;
+  text-align: left;
 }
 
-.request-info strong,.request-info small {
+.request-info strong,
+.request-info small {
   display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .request-info strong {
-  font-size: 12px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
 }
 
 .request-info small {
-  font-size: 10px;
-  margin-top: 4px;
+  font-size: 12px;
+  margin-top: 5px;
+  color: var(--text-secondary);
 }
 
 .request-list-item button {
   padding: 8px 10px;
   font-size: 10px;
 }
-
 /* BOTTOM NAVIGATION */
 
 .bottom-nav {
@@ -1624,22 +1630,25 @@ video.post-media {
   filter: drop-shadow(0 0 7px var(--purple));
 }
 
-#notificationBadge {
+#notificationBadge,
+#messageBadge {
   position: absolute;
-  top: -1px;
-  right: 2px;
-  min-width: 16px;
-  height: 16px;
-  padding: 2px 4px;
+  top: -2px;
+  left: 50%;
+  transform: translateX(7px);
+  min-width: 17px;
+  height: 17px;
+  padding: 0 4px;
   display: grid;
   place-items: center;
-  border-radius: 20px;
-  background: var(--danger);
+  border-radius: 50px;
+  background: #ff3040;
   color: white;
   font-size: 9px;
   font-weight: 800;
+  line-height: 1;
+  border: 2px solid #0f0a18;
 }
-
 /* TOAST */
 
 #leakaToast {
@@ -2260,16 +2269,17 @@ body.create-modal-open {
 }
 
 #profileFollowList .request-list-item {
-  width: 100%;
   display: flex;
   align-items: center;
+  flex-wrap: nowrap;
+  gap: 12px;
+  padding: 13px 10px;
+  border-radius: 0;
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid var(--border);
+  width: 100%;
   text-align: left;
-  background: var(--panel);
-  border: 1px solid var(--border);
-  border-radius: 13px;
-  padding: 12px;
-  color: var(--text);
-  cursor: pointer;
 }
 
 #profileFollowList .request-info {
@@ -2334,4 +2344,374 @@ body.create-modal-open {
 
 .public-follow-list .request-info {
   flex: 1;
+}
+
+/* ================= MESSAGES PAGE ================= */
+
+#messages {
+  padding: 18px;
+  min-height: 80vh;
+}
+
+.messages-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 22px;
+}
+
+.messages-header h2 {
+  font-size: 25px;
+  font-weight: 800;
+}
+
+.messages-header button {
+  width: 42px;
+  height: 42px;
+  border: none;
+  border-radius: 50%;
+  background: var(--accent, #8b5cf6);
+  color: white;
+  font-size: 22px;
+  cursor: pointer;
+}
+
+.messages-tabs {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 18px;
+  overflow-x: auto;
+}
+
+.messages-tabs button {
+  padding: 10px 17px;
+  border: 1px solid var(--border-color, #333);
+  border-radius: 22px;
+  background: transparent;
+  color: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.messages-tabs button.active {
+  background: var(--accent, #8b5cf6);
+  color: white;
+  border-color: transparent;
+}
+
+.messages-search {
+  margin-bottom: 20px;
+}
+
+.messages-search input {
+  width: 100%;
+  padding: 14px 16px;
+  border-radius: 14px;
+  border: 1px solid var(--border-color, #333);
+  background: var(--card-bg, #17131e);
+  color: inherit;
+  outline: none;
+}
+
+.messages-search input:focus {
+  border-color: var(--accent, #8b5cf6);
+}
+
+.message-tab-content {
+  width: 100%;
+}
+
+#conversationsList,
+#incomingMessageRequests,
+#sentMessageRequests {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.message-conversation {
+  display: flex;
+  align-items: center;
+  gap: 13px;
+  padding: 13px;
+  border-radius: 14px;
+  background: var(--card-bg, #17131e);
+}
+
+.message-conversation:hover {
+  background: var(--hover-bg, #211a2d);
+}
+
+#messageRequestBadge {
+  margin-left: 5px;
+  font-size: 11px;
+  background: #ef4444;
+  color: white;
+  padding: 2px 6px;
+  border-radius: 10px;
+}
+
+/* HOME SEARCH BUTTON */
+
+.home-section-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.home-search-btn {
+  width: 42px;
+  height: 42px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--border-color, #333);
+  border-radius: 50%;
+  background: var(--card-bg, #17131e);
+  color: inherit;
+  cursor: pointer;
+}
+
+.home-search-btn:active {
+  transform: scale(0.94);
+}
+
+/* ================= LEAKA PRIVATE CHAT DESIGN ================= */
+
+#privateChatView {
+  display: flex;
+  flex-direction: column;
+  height: 75vh;
+  min-height: 450px;
+  background: var(--card-bg, #17131e);
+  border-radius: 18px;
+  overflow: hidden;
+}
+
+#privateChatView[hidden] {
+  display: none;
+}
+
+.private-chat-header {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 15px;
+  border-bottom: 1px solid var(--border-color, #333);
+}
+
+#backToMessagesBtn {
+  background: transparent;
+  border: none;
+  color: inherit;
+  font-size: 25px;
+  cursor: pointer;
+}
+
+.private-chat-user {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+#chatUserAvatar {
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  overflow: hidden;
+}
+
+#chatUserAvatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.private-chat-user strong,
+.private-chat-user small {
+  display: block;
+}
+
+.private-chat-user small {
+  color: #999;
+  margin-top: 3px;
+}
+
+#chatMessages {
+  flex: 1;
+  overflow-y: auto;
+  padding: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.chat-message {
+  max-width: 78%;
+  width: fit-content;
+  padding: 11px 15px;
+  border-radius: 17px;
+  overflow-wrap: anywhere;
+  line-height: 1.5;
+}
+
+.chat-message.sent {
+  align-self: flex-end;
+  background: var(--accent, #8b5cf6);
+  color: white;
+  border-bottom-right-radius: 4px;
+}
+
+.chat-message.received {
+  align-self: flex-start;
+  background: #302a3b;
+  color: white;
+  border-bottom-left-radius: 4px;
+}
+
+#chatMessageForm {
+  display: flex;
+  gap: 10px;
+  padding: 13px;
+  border-top: 1px solid var(--border-color, #333);
+}
+
+#chatMessageInput {
+  flex: 1;
+  min-width: 0;
+  padding: 13px;
+  border: 1px solid var(--border-color, #444);
+  border-radius: 25px;
+  background: var(--background, #100d16);
+  color: inherit;
+  outline: none;
+}
+
+#sendChatMessageBtn {
+  width: 45px;
+  height: 45px;
+  border: none;
+  border-radius: 50%;
+  background: var(--accent, #8b5cf6);
+  color: white;
+  font-size: 19px;
+  cursor: pointer;
+}
+
+#sendChatMessageBtn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* ================= PRIVATE CHAT NAVIGATION FIX ================= */
+
+#privateChatView {
+  height: calc(100dvh - 170px);
+  min-height: 350px;
+  padding-bottom: 85px;
+  box-sizing: border-box;
+}
+
+#chatMessages {
+  min-height: 0;
+  padding-bottom: 20px;
+}
+
+#chatMessageForm {
+  position: sticky;
+  bottom: 0;
+  z-index: 20;
+  background: var(--card-bg, #17131e);
+  flex-shrink: 0;
+}
+
+#chatMessageInput {
+  min-height: 45px;
+}
+
+/* Keep chat content above fixed bottom navigation */
+body:has(#privateChatView:not([hidden])) {
+  padding-bottom: 85px;
+}
+.message-chat-meta {
+  align-self: flex-start;
+  margin-left: auto;
+  padding-top: 3px;
+  white-space: nowrap;
+}
+
+.message-chat-meta small {
+  font-size: 10px;
+  color: var(--muted);
+}
+
+/* ================= FULL SCREEN PRIVATE CHAT ================= */
+
+#privateChatView {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  width: 100%;
+  height: 100vh;
+  height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  background: var(--background, #100d16);
+  overflow: hidden;
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+#privateChatView[hidden] {
+  display: none !important;
+}
+
+#privateChatView .private-chat-header {
+  flex-shrink: 0;
+  padding: 14px 16px;
+  padding-top: calc(14px + env(safe-area-inset-top));
+  background: #171020;
+  z-index: 2;
+}
+
+#chatMessages {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+#chatMessageForm {
+  flex-shrink: 0;
+  background: #171020;
+  padding-bottom: 12px;
+}
+
+/* Hide navigation while private chat is open */
+body.private-chat-open .bottom-nav {
+  display: none !important;
+}
+/* LEAKA UNREAD CHAT BADGES */
+.unread-chat-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 22px;
+  height: 22px;
+  padding: 0 6px;
+  border-radius: 50px;
+  background: #923BEB;
+  color: #ffffff;
+  font-size: 11px;
+  font-weight: 800;
+  margin-top: 6px;
+  box-shadow: 0 0 10px rgba(146, 59, 235, 0.35);
+}
+
+.message-chat-meta {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  justify-content: center;
+  gap: 3px;
+  flex-shrink: 0;
 }
