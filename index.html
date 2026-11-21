@@ -110,9 +110,33 @@
 
         <section class="stories-section">
 
-          <div class="section-heading">
-            <h3>Stories</h3>
-          </div>
+          
+<div class="section-heading home-section-heading">
+
+  <h3>Stories</h3>
+
+  <button
+    type="button"
+    id="homeSearchBtn"
+    class="home-search-btn"
+    aria-label="Search LEAKA"
+  >
+    <svg
+      viewBox="0 0 24 24"
+      width="23"
+      height="23"
+      fill="none"
+      stroke="currentColor"
+      stroke-width="2"
+      stroke-linecap="round"
+    >
+      <circle cx="11" cy="11" r="7"></circle>
+      <path d="m16 16 4 4"></path>
+    </svg>
+  </button>
+
+</div>
+
 
           <div class="stories-container" id="storiesContainer">
 
@@ -210,6 +234,126 @@
         </div>
 
       </section>
+      
+      
+<!-- ================= MESSAGES PAGE ================= -->
+
+<section class="page" id="messages" hidden>
+
+  <div class="messages-header">
+    <h2>Messages</h2>
+
+    <button type="button" id="newMessageBtn">
+      ✎
+    </button>
+  </div>
+
+  <div class="messages-tabs">
+
+    <button type="button" class="active" data-message-tab="chats">
+      Chats
+    </button>
+
+    <button type="button" data-message-tab="requests">
+      Requests
+      <span id="messageRequestBadge" hidden>0</span>
+    </button>
+
+    <button type="button" data-message-tab="sent">
+      Sent
+    </button>
+
+  </div>
+
+  <div class="messages-search">
+    <input
+      type="search"
+      id="conversationSearch"
+      placeholder="Search conversations..."
+    >
+  </div>
+
+  <div id="messagesContent">
+
+    <div id="chatsTab" class="message-tab-content">
+
+      <div id="conversationsList">
+        <div class="empty-state">
+          <div class="leaka-spinner"></div>
+          <p>Loading conversations...</p>
+        </div>
+      </div>
+
+    </div>
+
+    <div id="messageRequestsTab" class="message-tab-content" hidden>
+
+      <div id="incomingMessageRequests"></div>
+
+    </div>
+
+    <div id="sentMessagesTab" class="message-tab-content" hidden>
+
+      <div id="sentMessageRequests"></div>
+
+    </div>
+
+  </div>
+
+
+<!-- ================= PRIVATE CHAT VIEW ================= -->
+
+<div id="privateChatView" hidden>
+
+  <div class="private-chat-header">
+
+    <button type="button" id="backToMessagesBtn">
+      ←
+    </button>
+
+    <div class="private-chat-user">
+      <div id="chatUserAvatar"></div>
+      <div>
+        <strong id="chatUserName">User</strong>
+        <small id="chatUserHandle"></small>
+      </div>
+    </div>
+
+  </div>
+
+  <div id="chatMessages">
+
+    <div class="empty-state">
+      <p>Loading conversation...</p>
+    </div>
+
+  </div>
+
+  <form id="chatMessageForm">
+
+    <input
+      type="text"
+      id="chatMessageInput"
+      placeholder="Write a message..."
+      maxlength="5000"
+      autocomplete="off"
+      required
+    >
+
+    <button type="submit" id="sendChatMessageBtn">
+      ➤
+    </button>
+
+  </form>
+
+</div>
+
+<!-- END PRIVATE CHAT VIEW -->
+
+
+</section>
+
+<!-- END MESSAGES PAGE -->
 
 
       <!-- ================= SEARCH PAGE ================= -->
@@ -657,6 +801,7 @@
 
 
   
+
 <!-- ================= BOTTOM NAVIGATION ================= -->
 
 <nav class="bottom-nav" aria-label="Main navigation">
@@ -672,10 +817,11 @@
 
   <button
     type="button"
-    data-page="search"
+    data-page="messages"
   >
-    <span>⌕</span>
-    <small>Discover</small>
+    <span>♧</span>
+    <small>Messages</small>
+    <span id="messageBadge" hidden>0</span>
   </button>
 
   <button
