@@ -1520,173 +1520,180 @@ async function loadFeed() {
          Most liked comments first
       ========================================= */
 
-      const topLevelComments = postComments
-        .filter(comment => !comment.parent_comment_id)
-        .sort((a, b) => {
-          const aLikes =
-            (likesByComment[a.id] || []).length;
+      
+const topLevelComments = postComments
+  .filter(comment => !comment.parent_comment_id)
+  .sort((a, b) => {
 
-          const bLikes =
-            (likesByComment[b.id] || []).length;
+    // Pinned comments always come first
+    if (a.is_pinned && !b.is_pinned) return -1;
+    if (!a.is_pinned && b.is_pinned) return 1;
 
-          return (
-            bLikes - aLikes ||
-            new Date(a.created_at) - new Date(b.created_at)
-          );
-        });
+    // Then sort by likes
+    const aLikes =
+      (likesByComment[a.id] || []).length;
+
+    const bLikes =
+      (likesByComment[b.id] || []).length;
+
+    return (
+      bLikes - aLikes ||
+      new Date(a.created_at) - new Date(b.created_at)
+    );
+  });
+
 
       /* =========================================
          11. COMMENT RENDERER
          Supports nested replies
       ========================================= */
 
-      const renderComment = (
-        comment,
-        depth = 0,
-        ancestors = new Set()
-      ) => {
+      
+const renderComment = (
+  comment,
+  depth = 0,
+  ancestors = new Set()
+) => {
 
-        if (ancestors.has(comment.id)) return "";
+  if (ancestors.has(comment.id)) return "";
 
-        const nextAncestors = new Set(ancestors);
-        nextAncestors.add(comment.id);
+  const nextAncestors = new Set(ancestors);
+  nextAncestors.add(comment.id);
 
-        const commenter = commentProfiles[comment.user_id];
+  const commenter = commentProfiles[comment.user_id];
 
-        const username =
-          commenter?.username ||
-          commenter?.display_name ||
-          "User";
+  const username =
+    commenter?.username ||
+    commenter?.display_name ||
+    "User";
 
-        const commentBadges =
-          typeof getLeakaBadges === "function"
-            ? getLeakaBadges(comment.user_id)
-            : "";
+  const commentBadges =
+    typeof getLeakaBadges === "function"
+      ? getLeakaBadges(comment.user_id)
+      : "";
 
-        const isCreator =
-          comment.user_id === post.user_id;
+  const isCreator =
+    comment.user_id === post.user_id;
 
-        const commentLikeList =
-          likesByComment[comment.id] || [];
+  const commentLikeList =
+    likesByComment[comment.id] || [];
 
-        const commentLiked = commentLikeList.some(
-          like => like.user_id === currentUser.id
-        );
+  const commentLiked = commentLikeList.some(
+    like => like.user_id === currentUser.id
+  );
 
-        /* Parent information */
+  /* Parent information */
 
-        const parentComment = postComments.find(
-          item => item.id === comment.parent_comment_id
-        );
+  const parentComment = postComments.find(
+    item => item.id === comment.parent_comment_id
+  );
 
-        const parentProfile = parentComment
-          ? commentProfiles[parentComment.user_id]
-          : null;
+  const parentProfile = parentComment
+    ? commentProfiles[parentComment.user_id]
+    : null;
 
-        const replyingTo = parentProfile
-          ? parentProfile.username ||
-            parentProfile.display_name ||
-            "User"
-          : null;
+  const replyingTo = parentProfile
+    ? parentProfile.username ||
+      parentProfile.display_name ||
+      "User"
+    : null;
 
-        /* Replies */
+  /* Replies */
 
-        const replies = (
-          repliesByComment[comment.id] || []
-        ).sort((a, b) =>
-          new Date(a.created_at) - new Date(b.created_at)
-        );
+  const replies = (
+    repliesByComment[comment.id] || []
+  ).sort((a, b) =>
+    new Date(a.created_at) - new Date(b.created_at)
+  );
 
-        const replyHTML = replies
-          .map(reply =>
-            renderComment(
-              reply,
-              depth + 1,
-              nextAncestors
-            )
-          )
-          .join("");
+  const replyHTML = replies
+    .map(reply =>
+      renderComment(reply, depth + 1, nextAncestors)
+    )
+    .join("");
 
-        const replyToggle = replies.length
+  const replyToggle = replies.length
+    ? `
+      <button
+        type="button"
+        class="view-replies-btn"
+        data-toggle-replies
+        data-reply-count="${replies.length}">
+        View replies (${replies.length})
+      </button>
+    `
+    : "";
+
+  return `
+    <div
+      class="leaka-comment ${depth > 0 ? "reply-comment" : ""} ${comment.is_pinned ? "pinned-comment" : ""}"
+      data-comment-id="${escapeHTML(comment.id)}"
+    >
+
+      <div class="leaka-comment-content">
+
+        ${comment.is_pinned
+          ? `<div class="leaka-pinned-label">📌 PINNED</div>`
+          : ""}
+
+        <strong>
+          ${escapeHTML(username)}
+        </strong>
+
+        ${commentBadges}
+
+        ${replyingTo
           ? `
-            <button
-              type="button"
-              class="view-replies-btn"
-              data-toggle-replies
-              data-reply-count="${replies.length}">
-              View replies (${replies.length})
-            </button>
+            <small class="comment-replying-to">
+              ↳ Replying to @${escapeHTML(replyingTo)}
+            </small>
           `
-          : "";
+          : ""}
 
-  
-return `
-  <div
-    class="leaka-comment ${depth > 0 ? "reply-comment" : ""}"
-    data-comment-id="${escapeHTML(comment.id)}"
-  >
+        ${isCreator
+          ? `<span class="creator-badge">CREATOR</span>`
+          : ""}
 
-    <div class="leaka-comment-content">
+        <p>${escapeHTML(comment.content || "")}</p>
 
-      <strong>
-        ${escapeHTML(username)}
-      </strong>
+        <div class="comment-actions">
 
-      ${commentBadges}
+          <button
+            type="button"
+            class="comment-like-btn ${commentLiked ? "liked" : ""}"
+            data-like-comment="${escapeHTML(comment.id)}">
 
-      ${replyingTo
-        ? `
-          <small class="comment-replying-to">
-            ↳ Replying to @${escapeHTML(replyingTo)}
+            ${commentLiked ? "♥" : "♡"}
+
+            <span>${commentLikeList.length}</span>
+          </button>
+
+          <button
+            type="button"
+            class="comment-reply-btn"
+            data-reply-comment="${escapeHTML(comment.id)}">
+            Reply
+          </button>
+
+          <small>
+            ${formatTime(comment.created_at)}
           </small>
-        `
-        : ""}
 
-      ${isCreator
-        ? `<span class="creator-badge">CREATOR</span>`
-        : ""}
+        </div>
 
-      <p>${escapeHTML(comment.content || "")}</p>
+        ${replyToggle}
 
-      <div class="comment-actions">
-
-        <button
-          type="button"
-          class="comment-like-btn ${commentLiked ? "liked" : ""}"
-          data-like-comment="${escapeHTML(comment.id)}">
-
-          ${commentLiked ? "♥" : "♡"}
-
-          <span>${commentLikeList.length}</span>
-        </button>
-
-        <button
-          type="button"
-          class="comment-reply-btn"
-          data-reply-comment="${escapeHTML(comment.id)}">
-          Reply
-        </button>
-
-        <small>
-          ${formatTime(comment.created_at)}
-        </small>
+        <div
+          class="comment-replies"
+          ${replies.length ? "hidden" : ""}
+        >
+          ${replyHTML}
+        </div>
 
       </div>
-
-      ${replyToggle}
-
-      <div
-        class="comment-replies"
-        ${replies.length ? "hidden" : ""}
-      >
-        ${replyHTML}
-      </div>
-
     </div>
-  </div>
-`;
-
-      };
+  `;
+};
 
       /* =========================================
          12. GENERATE COMMENT HTML
@@ -2005,6 +2012,189 @@ async function toggleCommentLike(commentId) {
   }
 
   buttons.forEach(button => button.disabled = false);
+}
+
+
+
+async function pinLeakaComment(commentId) {
+  if (!currentUser) return;
+
+  try {
+    // 1. Find comment
+    const { data: comment, error: findError } = await db
+      .from("comments")
+      .select("id, post_id, user_id, is_pinned")
+      .eq("id", commentId)
+      .single();
+
+    if (findError || !comment) {
+      throw new Error("Comment not found.");
+    }
+
+    // 2. Find post owner
+    const { data: post, error: postError } = await db
+      .from("posts")
+      .select("user_id")
+      .eq("id", comment.post_id)
+      .single();
+
+    if (postError || !post) {
+      throw new Error("Post not found.");
+    }
+
+    // 3. Check LEAKA Owner role
+    const { data: role, error: roleError } = await db
+      .from("leaka_user_roles")
+      .select("role")
+      .eq("user_id", currentUser.id)
+      .maybeSingle();
+
+    if (roleError) throw roleError;
+
+    const isOwner = role?.role === "Owner";
+    const isPostOwner = post.user_id === currentUser.id;
+
+    if (!isOwner && !isPostOwner) {
+      showToast("You cannot pin this comment.");
+      return;
+    }
+
+    // 4. If already pinned, simply unpin it
+    if (comment.is_pinned) {
+      const { error } = await db
+        .from("comments")
+        .update({ is_pinned: false })
+        .eq("id", commentId);
+
+      if (error) throw error;
+
+      showToast("Comment unpinned!");
+      await loadFeed();
+      return;
+    }
+
+    // 5. Unpin the previous comment
+    const { error: unpinError } = await db
+      .from("comments")
+      .update({ is_pinned: false })
+      .eq("post_id", comment.post_id)
+      .eq("is_pinned", true);
+
+    if (unpinError) throw unpinError;
+
+    // 6. Pin the selected comment
+    const { error: pinError } = await db
+      .from("comments")
+      .update({ is_pinned: true })
+      .eq("id", commentId);
+
+    if (pinError) throw pinError;
+
+    showToast("Comment pinned successfully!");
+
+    await loadFeed();
+
+  } catch (error) {
+    console.error("PIN COMMENT ERROR:", error);
+    showToast("Could not pin comment: " + error.message);
+  }
+}
+
+
+/* =========================================================
+   LEAKA COMMENT MANAGEMENT
+========================================================= */
+
+// COPY COMMENT
+async function copyLeakaComment(commentId) {
+  try {
+    const { data, error } = await db
+      .from("comments")
+      .select("content")
+      .eq("id", commentId)
+      .single();
+
+    if (error) throw error;
+
+    await navigator.clipboard.writeText(data.content || "");
+
+    showToast("Comment copied!");
+  } catch (error) {
+    console.error("COPY COMMENT ERROR:", error);
+    showToast("Could not copy comment.");
+  }
+}
+
+
+// DELETE COMMENT
+async function deleteLeakaComment(commentId) {
+  if (!confirm("Are you sure you want to delete this comment?")) {
+    return;
+  }
+
+  try {
+    const { data: comment, error: findError } = await db
+      .from("comments")
+      .select("id, post_id")
+      .eq("id", commentId)
+      .single();
+
+    if (findError) throw findError;
+
+    const { error } = await db
+      .from("comments")
+      .delete()
+      .eq("id", commentId);
+
+    if (error) throw error;
+
+    showToast("Comment deleted!");
+
+    const overlay = $("leakaCommentsOverlay");
+    const postId = comment.post_id;
+    const overlayOpen =
+      overlay &&
+      !overlay.hidden &&
+      overlay.dataset.postId === postId;
+
+    await loadFeed();
+
+    if (overlayOpen) {
+      openComments(postId);
+    }
+
+  } catch (error) {
+    console.error("DELETE COMMENT ERROR:", error);
+    showToast("Could not delete comment: " + error.message);
+  }
+}
+
+
+// PIN COMMENT
+async function pinLeakaComment(commentId) {
+  try {
+    const { error } = await db.rpc("pin_leaka_comment", {
+      target_comment_id: commentId
+    });
+
+    if (error) throw error;
+
+    showToast("Comment pinned!");
+
+    const overlay = $("leakaCommentsOverlay");
+    const postId = overlay?.dataset.postId;
+    const overlayOpen = overlay && !overlay.hidden && postId;
+
+    await loadFeed();
+
+    if (overlayOpen) {
+      openComments(postId);
+    }
+
+  } catch (error) {
+    console.error("PIN COMMENT ERROR:", error);
+    showToast("Could not pin comment: " + error.message);
+  }
 }
 
 
@@ -4643,6 +4833,7 @@ const card = document
   }
 
   overlay.dataset.postId = postId;
+  overlay.dataset.creatorId = card.dataset.creatorId || "";
 
   const video = card.querySelector("video");
 
@@ -4898,6 +5089,151 @@ function initializeGlobalEvents() {
     }
 
   });
+  
+  
+  // =====================================================
+  // LEAKA COMMENT LONG-PRESS MENU
+  // =====================================================
+
+  let commentPressTimer = null;
+  let commentPressTarget = null;
+
+  function closeLeakaCommentMenu() {
+    document.querySelector(".leaka-comment-menu")?.remove();
+  }
+
+  async function openLeakaCommentMenu(commentElement, x, y) {
+    if (!currentUser) return;
+
+    const commentId = commentElement.dataset.commentId;
+
+    const { data: comment, error } = await db
+      .from("comments")
+      .select("id, post_id, user_id, content, is_pinned")
+      .eq("id", commentId)
+      .single();
+
+    if (error || !comment) {
+      showToast("Could not load comment.");
+      return;
+    }
+
+    const postCard = commentElement.closest(".post-card");
+
+    const postOwnerId =
+  postCard?.dataset.creatorId ||
+  commentElement.closest("#leakaCommentsOverlay")?.dataset.creatorId ||
+  $("leakaCommentsOverlay")?.dataset.creatorId ||
+  document.querySelector(
+    `[data-submit-comment="${comment.post_id}"]`
+  )?.closest(".post-card")?.dataset.creatorId;
+
+    // Load current user's actual role from Supabase
+    const { data: roleData } = await db
+      .from("leaka_user_roles")
+      .select("role")
+      .eq("user_id", currentUser.id)
+      .maybeSingle();
+
+    const isOwner = roleData?.role === "Owner";
+    const isCommentOwner = comment.user_id === currentUser.id;
+    const isPostOwner = postOwnerId === currentUser.id;
+
+    const menu = document.createElement("div");
+    menu.className = "leaka-comment-menu";
+
+    const addOption = (label, icon, action, className = "") => {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = className;
+      button.innerHTML = `<span>${icon}</span><span>${label}</span>`;
+      button.addEventListener("click", async () => {
+        closeLeakaCommentMenu();
+        await action();
+      });
+      menu.appendChild(button);
+    };
+
+    addOption("Copy", "📋", () =>
+      copyLeakaComment(comment.id)
+    );
+
+    if (isCommentOwner || isPostOwner || isOwner) {
+      addOption("Delete", "🗑️", () =>
+        deleteLeakaComment(comment.id),
+        "delete-action"
+      );
+    }
+
+    if (isPostOwner || isOwner) {
+      addOption(
+        comment.is_pinned ? "Pin again" : "Pin",
+        "📌",
+        () => pinLeakaComment(comment.id),
+        "pin-action"
+      );
+    }
+
+    if (!isCommentOwner) {
+      addOption("Report", "🚩", () =>
+        showToast("Report system is the next step.")
+      );
+    }
+
+    closeLeakaCommentMenu();
+
+    document.body.appendChild(menu);
+
+    const menuWidth = 220;
+    const menuHeight = menu.offsetHeight;
+
+    menu.style.left =
+      Math.max(8, Math.min(x, window.innerWidth - menuWidth - 8)) + "px";
+
+    menu.style.top =
+      Math.max(8, Math.min(y, window.innerHeight - menuHeight - 8)) + "px";
+  }
+
+  document.addEventListener("pointerdown", event => {
+    const comment = event.target.closest(".leaka-comment");
+
+    if (!comment) return;
+
+    if (event.pointerType === "mouse" && event.button !== 0) return;
+
+    commentPressTarget = comment;
+
+    commentPressTimer = setTimeout(() => {
+      if (!commentPressTarget) return;
+
+      openLeakaCommentMenu(
+        commentPressTarget,
+        event.clientX,
+        event.clientY
+      );
+
+      commentPressTarget = null;
+    }, 550);
+  });
+
+  document.addEventListener("pointerup", () => {
+    clearTimeout(commentPressTimer);
+    commentPressTimer = null;
+    commentPressTarget = null;
+  });
+
+  document.addEventListener("pointercancel", () => {
+    clearTimeout(commentPressTimer);
+    commentPressTimer = null;
+    commentPressTarget = null;
+  });
+
+  document.addEventListener("click", event => {
+    if (!event.target.closest(".leaka-comment-menu")) {
+      closeLeakaCommentMenu();
+    }
+  });
+
 
   $("profilePosts")?.addEventListener("click", event => {
 
